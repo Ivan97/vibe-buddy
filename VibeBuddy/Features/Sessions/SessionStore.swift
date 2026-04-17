@@ -8,6 +8,8 @@ final class SessionStore: ObservableObject {
 
     let claudeHome: ClaudeHome
     private let summaryBuilder: SessionSummaryBuilder
+    private var watcher: DirectoryWatcher?
+    private var debounceTask: Task<Void, Never>?
 
     init(
         claudeHome: ClaudeHome = .discover(),
@@ -15,6 +17,10 @@ final class SessionStore: ObservableObject {
     ) {
         self.claudeHome = claudeHome
         self.summaryBuilder = summaryBuilder
+    }
+
+    deinit {
+        // DirectoryWatcher stops itself in its own deinit.
     }
 
     func reload() async {
@@ -39,6 +45,35 @@ final class SessionStore: ObservableObject {
             summaries = list
         case .failure(let error):
             loadError = Self.humanReadable(error)
+        }
+    }
+
+    /// Starts the FSEvents watcher on the projects directory. Idempotent.
+    /// Callers should invoke this after the initial `reload()` so incremental
+    /// changes (new sessions, appended messages) trigger a debounced refresh.
+    func startWatching() {
+        guard watcher == nil else { return }
+        let projectsDir = claudeHome.projectsDir
+        let watcher = DirectoryWatcher(url: projectsDir) { [weak self] in
+            Task { @MainActor in
+                self?.scheduleReload()
+            }
+        }
+        watcher.start()
+        self.watcher = watcher
+    }
+
+    func stopWatching() {
+        watcher?.stop()
+        watcher = nil
+    }
+
+    private func scheduleReload() {
+        debounceTask?.cancel()
+        debounceTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            await self?.reload()
         }
     }
 

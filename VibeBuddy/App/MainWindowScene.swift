@@ -14,6 +14,7 @@ struct MainWindowScene: Scene {
                     if sessionStore.summaries.isEmpty {
                         await sessionStore.reload()
                     }
+                    sessionStore.startWatching()
                 }
         }
         .defaultSize(width: 1040, height: 680)
