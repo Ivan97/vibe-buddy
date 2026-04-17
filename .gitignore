@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# Xcode build artifacts
+build/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+
+# Generated Xcode project (regenerate with `xcodegen generate`)
+VibeBuddy.xcodeproj/
+
+# Swift Package Manager
+.swiftpm/
+.build/
+Packages/
+Package.resolved
+
+# AppCode / JetBrains
+.idea/
+
+# Secrets
+*.env
+secrets/

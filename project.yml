@@ -1,0 +1,84 @@
+name: VibeBuddy
+
+options:
+  bundleIdPrefix: tech.iooo
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+  generateEmptyDirectories: true
+  xcodeVersion: "16.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    SWIFT_STRICT_CONCURRENCY: minimal
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "-"
+    ENABLE_HARDENED_RUNTIME: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    DEAD_CODE_STRIPPING: YES
+
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.6.0"
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa
+    from: "8.40.0"
+  ConfettiSwiftUI:
+    url: https://github.com/simibac/ConfettiSwiftUI
+    from: "2.0.0"
+
+targets:
+  VibeBuddy:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: VibeBuddy
+        excludes:
+          - "Info.plist"
+          - "VibeBuddy.entitlements"
+    info:
+      path: VibeBuddy/Info.plist
+      properties:
+        CFBundleName: VibeBuddy
+        CFBundleDisplayName: Vibe Buddy
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSHumanReadableCopyright: "Copyright © 2026 Vibe Buddy. All rights reserved."
+        NSPrincipalClass: NSApplication
+        NSSupportsAutomaticTermination: true
+        NSSupportsSuddenTermination: true
+        # --- Sparkle ---
+        SUFeedURL: "https://example.com/vibebuddy/appcast.xml"
+        SUPublicEDKey: ""
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
+        # --- Sentry (optional: set SENTRY_DSN env var at runtime instead) ---
+        SentryDSN: ""
+    entitlements:
+      path: VibeBuddy/VibeBuddy.entitlements
+      properties:
+        com.apple.security.app-sandbox: false
+        com.apple.security.cs.allow-jit: true
+    dependencies:
+      - package: Sparkle
+        product: Sparkle
+      - package: Sentry
+        product: Sentry
+      - package: ConfettiSwiftUI
+        product: ConfettiSwiftUI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: tech.iooo.vibebuddy
+        GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        COMBINE_HIDPI_IMAGES: YES
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
