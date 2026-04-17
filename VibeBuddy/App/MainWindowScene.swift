@@ -5,9 +5,9 @@ struct MainWindowScene: Scene {
 
     var body: some Scene {
         WindowGroup("VibeBuddy", id: MainWindowScene.windowID) {
-            ContentView()
+            AppShellView()
                 .environmentObject(updater)
-                .frame(minWidth: 720, minHeight: 480)
+                .frame(minWidth: 840, minHeight: 520)
         }
         .defaultSize(width: 1040, height: 680)
         .commands {
