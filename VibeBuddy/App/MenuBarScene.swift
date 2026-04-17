@@ -2,10 +2,11 @@ import SwiftUI
 
 struct MenuBarScene: Scene {
     @ObservedObject var updater: SparkleUpdaterController
+    @ObservedObject var sessionStore: SessionStore
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarContent(updater: updater)
+            MenuBarContent(updater: updater, sessionStore: sessionStore)
         } label: {
             Image(systemName: "sparkles")
         }
@@ -15,6 +16,7 @@ struct MenuBarScene: Scene {
 
 private struct MenuBarContent: View {
     @ObservedObject var updater: SparkleUpdaterController
+    @ObservedObject var sessionStore: SessionStore
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
