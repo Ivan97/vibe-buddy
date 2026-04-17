@@ -3,12 +3,14 @@ import SwiftUI
 struct MainWindowScene: Scene {
     @ObservedObject var updater: SparkleUpdaterController
     @ObservedObject var sessionStore: SessionStore
+    @ObservedObject var navigator: Navigator
 
     var body: some Scene {
         WindowGroup("VibeBuddy", id: MainWindowScene.windowID) {
             AppShellView()
                 .environmentObject(updater)
                 .environmentObject(sessionStore)
+                .environmentObject(navigator)
                 .frame(minWidth: 840, minHeight: 520)
                 .task {
                     if sessionStore.summaries.isEmpty {

@@ -5,6 +5,7 @@ import SwiftUI
 /// placeholder in P0-6.
 struct SessionListDetailView: View {
     @ObservedObject var store: SessionStore
+    @EnvironmentObject private var navigator: Navigator
     @State private var selectedID: SessionSummary.ID?
     @State private var searchText: String = ""
 
@@ -37,6 +38,14 @@ struct SessionListDetailView: View {
             }
             .frame(minWidth: 400)
         }
+        .onAppear(perform: consumePendingOpen)
+        .onChange(of: navigator.pendingSessionID) { _, _ in consumePendingOpen() }
+    }
+
+    private func consumePendingOpen() {
+        guard let id = navigator.pendingSessionID else { return }
+        selectedID = id
+        navigator.pendingSessionID = nil
     }
 
     private var filteredSummaries: [SessionSummary] {
