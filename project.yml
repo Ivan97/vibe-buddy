@@ -51,16 +51,15 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        LSUIElement: false
         NSHumanReadableCopyright: "Copyright © 2026 Vibe Buddy. All rights reserved."
         NSPrincipalClass: NSApplication
         NSSupportsAutomaticTermination: true
         NSSupportsSuddenTermination: true
-        # --- Sparkle ---
         SUFeedURL: "https://example.com/vibebuddy/appcast.xml"
         SUPublicEDKey: ""
         SUEnableAutomaticChecks: true
         SUScheduledCheckInterval: 86400
-        # --- Sentry (optional: set SENTRY_DSN env var at runtime instead) ---
         SentryDSN: ""
     entitlements:
       path: VibeBuddy/VibeBuddy.entitlements
@@ -82,3 +81,24 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         COMBINE_HIDPI_IMAGES: YES
         MACOSX_DEPLOYMENT_TARGET: "14.0"
+    scheme:
+      testTargets:
+        - VibeBuddyTests
+      gatherCoverageData: true
+
+  VibeBuddyTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: VibeBuddyTests
+    dependencies:
+      - target: VibeBuddy
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: tech.iooo.vibebuddy.tests
+        GENERATE_INFOPLIST_FILE: YES
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/VibeBuddy.app/Contents/MacOS/VibeBuddy"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        SWIFT_VERSION: "5.0"
