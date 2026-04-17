@@ -22,7 +22,7 @@ struct SessionListDetailView: View {
 
             Group {
                 if let summary = selectedSummary {
-                    SessionDetailPlaceholderView(summary: summary)
+                    SessionDetailView(summary: summary)
                 } else {
                     VStack(spacing: 8) {
                         Image(systemName: "text.alignleft")
@@ -177,46 +177,3 @@ private struct SessionRow: View {
     }
 }
 
-private struct SessionDetailPlaceholderView: View {
-    let summary: SessionSummary
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(summary.firstPrompt ?? "(no prompt)")
-                    .font(.title2.bold())
-
-                HStack(spacing: 12) {
-                    Label {
-                        Text(summary.projectPath).lineLimit(1).truncationMode(.middle)
-                    } icon: {
-                        Image(systemName: "folder")
-                    }
-                    Text("·")
-                    Text("\(summary.messageCount) messages")
-                    if let v = summary.claudeVersion {
-                        Text("·")
-                        Text("CC v\(v)")
-                    }
-                    if let branch = summary.gitBranch, !branch.isEmpty {
-                        Text("·")
-                        Label(branch, systemImage: "arrow.triangle.branch")
-                    }
-                }
-                .font(.callout)
-                .foregroundStyle(.secondary)
-
-                Divider()
-
-                ContentUnavailableView(
-                    "Transcript renders in P0-6",
-                    systemImage: "text.alignleft",
-                    description: Text("The session's full message list — user / assistant / tool_use / tool_result — will land here when MessageRenderer ships.")
-                )
-                .frame(minHeight: 320)
-            }
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
-    }
-}
