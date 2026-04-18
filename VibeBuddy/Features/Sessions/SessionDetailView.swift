@@ -206,12 +206,35 @@ private struct TopLoadSentinel: View {
 
 private struct DetailHeader: View {
     let summary: SessionSummary
+    @EnvironmentObject private var titleStore: SessionTitleStore
+    @State private var renameSheetShown: Bool = false
+
+    private var displayTitle: String {
+        titleStore.customTitle(for: summary.id)
+            ?? summary.firstPrompt
+            ?? "(no prompt)"
+    }
+
+    private var isRenamed: Bool {
+        titleStore.customTitle(for: summary.id) != nil
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(summary.firstPrompt ?? "(no prompt)")
-                .font(.headline)
-                .lineLimit(2)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(displayTitle)
+                    .font(.headline)
+                    .lineLimit(2)
+                Button {
+                    renameSheetShown = true
+                } label: {
+                    Image(systemName: isRenamed ? "pencil.circle.fill" : "pencil")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                .help(isRenamed ? "Edit custom title" : "Rename session")
+            }
 
             HStack(spacing: 10) {
                 Label {
@@ -246,6 +269,13 @@ private struct DetailHeader: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .sheet(isPresented: $renameSheetShown) {
+            SessionRenameSheet(
+                sessionID: summary.id,
+                currentTitle: titleStore.customTitle(for: summary.id) ?? "",
+                fallbackTitle: summary.firstPrompt
+            )
+        }
     }
 }
 

@@ -5,6 +5,7 @@ struct VibeBuddyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var updater = SparkleUpdaterController()
     @StateObject private var sessionStore = SessionStore()
+    @StateObject private var sessionTitleStore = SessionTitleStore()
     @StateObject private var agentStore = AgentStore()
     @StateObject private var skillStore = SkillStore()
     @StateObject private var hooksStore = HooksStore()
@@ -15,6 +16,7 @@ struct VibeBuddyApp: App {
         MainWindowScene(
             updater: updater,
             sessionStore: sessionStore,
+            sessionTitleStore: sessionTitleStore,
             agentStore: agentStore,
             skillStore: skillStore,
             hooksStore: hooksStore,
@@ -24,6 +26,7 @@ struct VibeBuddyApp: App {
         MenuBarScene(
             updater: updater,
             sessionStore: sessionStore,
+            sessionTitleStore: sessionTitleStore,
             navigator: navigator
         )
     }

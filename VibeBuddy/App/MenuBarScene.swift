@@ -3,6 +3,7 @@ import SwiftUI
 struct MenuBarScene: Scene {
     @ObservedObject var updater: SparkleUpdaterController
     @ObservedObject var sessionStore: SessionStore
+    @ObservedObject var sessionTitleStore: SessionTitleStore
     @ObservedObject var navigator: Navigator
 
     var body: some Scene {
@@ -10,6 +11,7 @@ struct MenuBarScene: Scene {
             MenuBarPopover(
                 updater: updater,
                 sessionStore: sessionStore,
+                sessionTitleStore: sessionTitleStore,
                 navigator: navigator
             )
         } label: {
@@ -22,6 +24,7 @@ struct MenuBarScene: Scene {
 private struct MenuBarPopover: View {
     @ObservedObject var updater: SparkleUpdaterController
     @ObservedObject var sessionStore: SessionStore
+    @ObservedObject var sessionTitleStore: SessionTitleStore
     @ObservedObject var navigator: Navigator
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismiss) private var dismiss
@@ -42,7 +45,10 @@ private struct MenuBarPopover: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         ForEach(Array(sessionStore.summaries.prefix(5))) { summary in
-                            RecentSessionRow(summary: summary) {
+                            RecentSessionRow(
+                                summary: summary,
+                                customTitle: sessionTitleStore.customTitle(for: summary.id)
+                            ) {
                                 openSession(summary.id)
                             }
                         }
@@ -141,6 +147,7 @@ private struct MenuBarPopover: View {
 
 private struct RecentSessionRow: View {
     let summary: SessionSummary
+    let customTitle: String?
     let onOpen: () -> Void
     @State private var hovered = false
 
@@ -151,7 +158,7 @@ private struct RecentSessionRow: View {
                     .foregroundStyle(.secondary)
                     .padding(.top, 2)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(summary.firstPrompt ?? "(no prompt)")
+                    Text(customTitle ?? summary.firstPrompt ?? "(no prompt)")
                         .lineLimit(1)
                         .font(.callout)
                     HStack(spacing: 4) {

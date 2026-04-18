@@ -220,8 +220,20 @@ private struct ProjectHeader: View {
 private struct SessionRow: View {
     let summary: SessionSummary
     let now: Date
+    @EnvironmentObject private var titleStore: SessionTitleStore
+    @State private var renameSheetShown: Bool = false
 
     private var isLive: Bool { summary.isLive(now: now) }
+
+    private var displayTitle: String {
+        titleStore.customTitle(for: summary.id)
+            ?? summary.firstPrompt
+            ?? "(no prompt)"
+    }
+
+    private var isRenamed: Bool {
+        titleStore.customTitle(for: summary.id) != nil
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -233,7 +245,7 @@ private struct SessionRow: View {
                 .padding(.top, 6)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(summary.firstPrompt ?? "(no prompt)")
+                Text(displayTitle)
                     .font(.body)
                     .lineLimit(2)
 
@@ -259,6 +271,21 @@ private struct SessionRow: View {
             }
         }
         .padding(.vertical, 2)
+        .contextMenu {
+            Button("Rename…") { renameSheetShown = true }
+            if isRenamed {
+                Button("Reset to default prompt") {
+                    titleStore.setTitle(nil, for: summary.id)
+                }
+            }
+        }
+        .sheet(isPresented: $renameSheetShown) {
+            SessionRenameSheet(
+                sessionID: summary.id,
+                currentTitle: titleStore.customTitle(for: summary.id) ?? "",
+                fallbackTitle: summary.firstPrompt
+            )
+        }
     }
 }
 
