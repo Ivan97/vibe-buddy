@@ -12,10 +12,13 @@ struct PluginScanner: Sendable {
         let cacheDir = pluginsDir.appending(path: "cache", directoryHint: .isDirectory)
         guard fm.fileExists(atPath: cacheDir.path) else { return [] }
 
+        // Do NOT pass `.skipsHiddenFiles` — plugin manifests live at
+        // `<bundle>/.claude-plugin/plugin.json`, and the leading dot in
+        // `.claude-plugin` would otherwise make the enumerator refuse to
+        // descend into the dir and report zero installed plugins.
         guard let enumerator = fm.enumerator(
             at: cacheDir,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
+            includingPropertiesForKeys: [.isRegularFileKey]
         ) else { return [] }
 
         var out: [InstalledPlugin] = []
