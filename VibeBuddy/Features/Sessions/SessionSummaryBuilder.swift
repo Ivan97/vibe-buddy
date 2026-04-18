@@ -5,6 +5,14 @@ import Foundation
 /// single bad record never kills a whole project's list.
 struct SessionSummaryBuilder: Sendable {
 
+    /// Last relevant turn observed while walking the file — powers the
+    /// `inProgress` decision. Only `user` / `assistant` lines update it;
+    /// meta lines slide past.
+    private enum LastTurn {
+        case user
+        case assistant(stopReason: String?)
+    }
+
     /// Builds a summary, or returns `nil` if the file had nothing useful
     /// (no user/assistant lines and no cwd). Throws only on hard IO errors;
     /// parse errors per line are swallowed and the line is skipped.
@@ -15,6 +23,7 @@ struct SessionSummaryBuilder: Sendable {
         var claudeVersion: String?
         var lastTimestamp: Date?
         var messageCount = 0
+        var lastTurn: LastTurn?
 
         try JSONLReader(url: url).forEachLine { line in
             guard let obj = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
@@ -43,10 +52,13 @@ struct SessionSummaryBuilder: Sendable {
                    !content.isEmpty {
                     firstPrompt = String(content.prefix(120))
                 }
+                lastTurn = .user
             case "assistant":
                 messageCount += 1
+                let stopReason = (obj["message"] as? [String: Any])?["stop_reason"] as? String
+                lastTurn = .assistant(stopReason: stopReason)
             default:
-                break
+                break   // meta lines don't shift the in-progress signal
             }
         }
 
@@ -55,6 +67,16 @@ struct SessionSummaryBuilder: Sendable {
         let id = url.deletingPathExtension().lastPathComponent
         let mtime = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
         let lastActivity = mtime ?? lastTimestamp ?? .distantPast
+
+        let inProgress: Bool
+        switch lastTurn {
+        case .user:
+            inProgress = true
+        case .assistant(let reason):
+            inProgress = reason != "end_turn"
+        case .none:
+            inProgress = false
+        }
 
         return SessionSummary(
             id: id,
@@ -65,7 +87,8 @@ struct SessionSummaryBuilder: Sendable {
             messageCount: messageCount,
             lastActivity: lastActivity,
             claudeVersion: claudeVersion,
-            gitBranch: gitBranch
+            gitBranch: gitBranch,
+            inProgress: inProgress
         )
     }
 }

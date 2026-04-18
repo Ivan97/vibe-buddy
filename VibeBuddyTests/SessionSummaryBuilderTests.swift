@@ -81,6 +81,70 @@ struct SessionSummaryBuilderTests {
         #expect(summary.projectPath == "-fallback-slug")
     }
 
+    // MARK: - in-progress detection
+
+    @Test("session ending on a user turn is in progress (AI owes a reply)")
+    func userTailIsInProgress() throws {
+        let fixture = """
+        {"type":"user","cwd":"/w","message":{"role":"user","content":"First"}}
+        {"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Done"}],"stop_reason":"end_turn"}}
+        {"type":"user","message":{"role":"user","content":"Follow up"}}
+        """
+        let url = try writeTempJSONL(fixture)
+        let summary = try #require(try SessionSummaryBuilder().build(from: url, slug: "-w"))
+        #expect(summary.inProgress == true)
+    }
+
+    @Test("session ending on assistant end_turn is NOT in progress")
+    func assistantEndTurnIsDone() throws {
+        let fixture = """
+        {"type":"user","cwd":"/w","message":{"role":"user","content":"Hi"}}
+        {"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Hello"}],"stop_reason":"end_turn"}}
+        """
+        let url = try writeTempJSONL(fixture)
+        let summary = try #require(try SessionSummaryBuilder().build(from: url, slug: "-w"))
+        #expect(summary.inProgress == false)
+    }
+
+    @Test("assistant mid-tool-cycle (stop_reason=tool_use) is in progress")
+    func assistantToolUseIsInProgress() throws {
+        let fixture = """
+        {"type":"user","cwd":"/w","message":{"role":"user","content":"Run ls"}}
+        {"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{}}],"stop_reason":"tool_use"}}
+        """
+        let url = try writeTempJSONL(fixture)
+        let summary = try #require(try SessionSummaryBuilder().build(from: url, slug: "-w"))
+        #expect(summary.inProgress == true)
+    }
+
+    @Test("trailing meta lines (summary/system/attachment) don't flip off in-progress")
+    func trailingMetaIgnored() throws {
+        // Hook output and summary records can land after an active user
+        // turn. Those lines must not mark the session as finished.
+        let fixture = """
+        {"type":"user","cwd":"/w","message":{"role":"user","content":"Hi"}}
+        {"type":"summary","summary":"auto-summary","leafUuid":"u"}
+        {"type":"system","subtype":"hook-output","content":"stuff"}
+        """
+        let url = try writeTempJSONL(fixture)
+        let summary = try #require(try SessionSummaryBuilder().build(from: url, slug: "-w"))
+        #expect(summary.inProgress == true)
+    }
+
+    @Test("assistant without explicit stop_reason is treated as in-progress")
+    func assistantMissingStopReason() throws {
+        // Defensive: a half-written assistant line with no stop_reason
+        // field yet should still count as in-progress (we haven't seen
+        // end_turn).
+        let fixture = """
+        {"type":"user","cwd":"/w","message":{"role":"user","content":"Hi"}}
+        {"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"..."}]}}
+        """
+        let url = try writeTempJSONL(fixture)
+        let summary = try #require(try SessionSummaryBuilder().build(from: url, slug: "-w"))
+        #expect(summary.inProgress == true)
+    }
+
     // MARK: - helpers
 
     private func writeTempJSONL(_ content: String) throws -> URL {

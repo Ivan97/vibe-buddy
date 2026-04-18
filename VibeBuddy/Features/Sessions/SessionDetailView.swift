@@ -46,7 +46,17 @@ struct SessionDetailView: View {
                 }
             }
         }
-        .onAppear { loader.load(summary) }
+        .onChange(of: summary.id, initial: true) { _, _ in
+            // Called once on first appearance (initial: true) and again
+            // whenever the parent swaps in a different session. Reloading
+            // in-place keeps our view identity stable — see the note in
+            // SessionListView about why .id() is deliberately absent.
+            unpinTask?.cancel()
+            unpinTask = nil
+            isPinnedToBottom = true
+            snapPulse = false
+            loader.load(summary)
+        }
     }
 
     @ViewBuilder

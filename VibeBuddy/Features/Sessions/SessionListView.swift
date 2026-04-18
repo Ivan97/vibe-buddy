@@ -28,12 +28,16 @@ struct SessionListDetailView: View {
                 error: store.loadError,
                 onRefresh: { Task { await store.reload() } }
             )
-            .frame(minWidth: 280, idealWidth: 340)
+            .frame(minWidth: 280, idealWidth: 400)
 
             Group {
                 if let summary = selectedSummary {
+                    // NOTE: don't attach .id(summary.id) here — that forces
+                    // a new view identity on every session switch, which
+                    // HSplitView interprets as a new child and snaps the
+                    // divider back to the default split. SessionDetailView
+                    // observes summary.id internally to reload its state.
                     SessionDetailView(summary: summary)
-                        .id(summary.id)   // fresh state per session switch
                 } else {
                     VStack(spacing: 8) {
                         Image(systemName: "text.alignleft")
@@ -46,7 +50,7 @@ struct SessionListDetailView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .frame(minWidth: 400)
+            .frame(minWidth: 400, maxHeight: .infinity)
         }
         .onAppear(perform: consumePendingOpen)
         .onChange(of: navigator.pendingSessionID) { _, _ in consumePendingOpen() }
@@ -224,6 +228,7 @@ private struct SessionRow: View {
     @State private var renameSheetShown: Bool = false
 
     private var isLive: Bool { summary.isLive(now: now) }
+    private var isWorking: Bool { summary.isWorking(now: now) }
 
     private var displayTitle: String {
         titleStore.customTitle(for: summary.id)
@@ -238,20 +243,25 @@ private struct SessionRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             // Liveness indicator reserves a column so text aligns whether or
-            // not the dot is visible.
-            Circle()
-                .fill(isLive ? Color.green : Color.clear)
-                .frame(width: 6, height: 6)
+            // not the dot is visible. When the AI is actively generating,
+            // pulse the dot so you can tell "alive" from "working" at a
+            // glance — solid green = window open but idle, pulsing green =
+            // Claude is currently replying.
+            Image(systemName: "circle.fill")
+                .font(.system(size: 7))
+                .foregroundStyle(isLive ? Color.green : Color.clear)
+                .symbolEffect(.pulse, options: .repeating, isActive: isWorking)
                 .padding(.top, 6)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(displayTitle)
                     .font(.body)
                     .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 HStack(spacing: 6) {
                     if isLive {
-                        Text("live")
+                        Text(isWorking ? "replying…" : "live")
                             .font(.caption2.bold())
                             .foregroundStyle(.green)
                         Text("·")
@@ -270,7 +280,8 @@ private struct SessionRow: View {
                 .foregroundStyle(.secondary)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contextMenu {
             Button("Rename…") { renameSheetShown = true }
             if isRenamed {
