@@ -6,6 +6,7 @@ struct MainWindowScene: Scene {
     @ObservedObject var sessionTitleStore: SessionTitleStore
     @ObservedObject var agentStore: AgentStore
     @ObservedObject var skillStore: SkillStore
+    @ObservedObject var commandStore: CommandStore
     @ObservedObject var hooksStore: HooksStore
     @ObservedObject var pluginsStore: PluginsStore
     @ObservedObject var navigator: Navigator
@@ -18,6 +19,7 @@ struct MainWindowScene: Scene {
                 .environmentObject(sessionTitleStore)
                 .environmentObject(agentStore)
                 .environmentObject(skillStore)
+                .environmentObject(commandStore)
                 .environmentObject(hooksStore)
                 .environmentObject(pluginsStore)
                 .environmentObject(navigator)

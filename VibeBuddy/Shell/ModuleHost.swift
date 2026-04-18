@@ -12,12 +12,13 @@ struct ModuleHost: View {
                 SubagentsRoot()
             case .skills:
                 SkillsRoot()
+            case .prompts:
+                PromptsRoot()
             case .hooks:
                 HooksRoot()
             case .plugins:
                 PluginsRoot()
-            case .prompts,
-                 .statusline, .mcp:
+            case .statusline, .mcp:
                 ComingSoonView(route: route!)
             case .none:
                 EmptySelectionView()

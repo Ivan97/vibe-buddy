@@ -8,6 +8,7 @@ struct VibeBuddyApp: App {
     @StateObject private var sessionTitleStore = SessionTitleStore()
     @StateObject private var agentStore = AgentStore()
     @StateObject private var skillStore = SkillStore()
+    @StateObject private var commandStore = CommandStore()
     @StateObject private var hooksStore = HooksStore()
     @StateObject private var pluginsStore = PluginsStore()
     @StateObject private var navigator = Navigator()
@@ -19,6 +20,7 @@ struct VibeBuddyApp: App {
             sessionTitleStore: sessionTitleStore,
             agentStore: agentStore,
             skillStore: skillStore,
+            commandStore: commandStore,
             hooksStore: hooksStore,
             pluginsStore: pluginsStore,
             navigator: navigator
