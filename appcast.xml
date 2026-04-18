@@ -5,6 +5,18 @@
     <link>https://github.com/Ivan97/vibe-buddy</link>
     <description>Appcast feed for VibeBuddy. Entries are managed by scripts/release.sh + scripts/publish.sh.</description>
     <language>en</language>
+    <item>
+      <title>Version 0.1.0</title>
+      <pubDate>Sat, 18 Apr 2026 10:52:12 +0000</pubDate>
+      <sparkle:version>58</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/Ivan97/vibe-buddy/releases/download/v0.1.0/VibeBuddy-0.1.0.zip"
+        sparkle:edSignature="jYspgpIw8/jHoxLPqfOkmz12iHE1HALeFVBNqBRPgpLc6IbNrwGOBLzCqVYaN9MmvSOGqfWF0va7evv7cNDsCw=="
+        length="5129754"
+        type="application/octet-stream" />
+    </item>
     <!-- Release entries appear below once scripts/publish.sh runs. -->
   </channel>
 </rss>
