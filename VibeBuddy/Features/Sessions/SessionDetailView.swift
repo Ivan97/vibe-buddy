@@ -96,31 +96,24 @@ struct SessionDetailView: View {
             .defaultScrollAnchor(.bottom)      // initial position + resize anchor
             .textSelection(.enabled)
             .overlay(alignment: .bottom) {
+                // Transient magnetic-snap cue. Only visible during the
+                // pin engage / release moment — a quick accent flash that
+                // fades back to nothing. No persistent bottom treatment
+                // once the user settles in.
                 ZStack(alignment: .bottom) {
-                    // Persistent "magnetic pull" glow — visible while
-                    // pinned, fades to zero when the user scrolls away.
-                    // Gives an ongoing hint that the view is attached
-                    // to the bottom edge.
                     LinearGradient(
                         colors: [
-                            Color.accentColor.opacity(isPinnedToBottom ? 0.18 : 0),
+                            Color.accentColor.opacity(snapPulse ? 0.35 : 0),
                             Color.accentColor.opacity(0)
                         ],
                         startPoint: .bottom,
                         endPoint: .top
                     )
-                    .frame(height: 42)
-                    .animation(.easeInOut(duration: 0.25), value: isPinnedToBottom)
+                    .frame(height: 46)
 
-                    // Sharp 2-pt accent line along the very bottom while
-                    // pinned — reinforces the "attached" feel. Slightly
-                    // brighter during the transition pulse.
                     Rectangle()
-                        .fill(Color.accentColor.opacity(
-                            snapPulse ? 0.65 : (isPinnedToBottom ? 0.25 : 0)
-                        ))
+                        .fill(Color.accentColor.opacity(snapPulse ? 0.7 : 0))
                         .frame(height: 2)
-                        .animation(.easeInOut(duration: 0.25), value: isPinnedToBottom)
                 }
                 .allowsHitTesting(false)
             }
