@@ -59,9 +59,10 @@ targets:
         NSPrincipalClass: NSApplication
         NSSupportsAutomaticTermination: true
         NSSupportsSuddenTermination: true
-        # GitHub Pages serves appcast.xml from the repo root. If Pages isn't
-        # enabled yet, swap to raw.githubusercontent.com (see docs/RELEASING.md).
-        SUFeedURL: "https://ivan97.github.io/vibe-buddy/appcast.xml"
+        # GitHub Pages serves appcast.xml from the repo root, mapped to the
+        # custom domain blog.iooo.tech. If Pages ever gets reconfigured,
+        # raw.githubusercontent.com works as a fallback (see docs/RELEASING.md).
+        SUFeedURL: "https://blog.iooo.tech/vibe-buddy/appcast.xml"
         # ed25519 public key generated via `make sparkle-keys`. The matching
         # private key lives in the build machine's Keychain; rotating means
         # existing clients can't accept updates signed with a new key.
