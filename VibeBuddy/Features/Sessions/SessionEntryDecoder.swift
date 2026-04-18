@@ -53,7 +53,7 @@ struct SessionEntryDecoder: Sendable {
         guard let message = obj["message"] as? [String: Any] else { return nil }
 
         if let text = message["content"] as? String {
-            return .userText(text)
+            return .userText(RichText(raw: text))
         }
 
         guard let blocks = message["content"] as? [[String: Any]] else { return nil }
@@ -86,7 +86,7 @@ struct SessionEntryDecoder: Sendable {
             return .userToolResults(toolResults)
         }
         if !texts.isEmpty, toolResults.isEmpty {
-            return .userText(texts.joined(separator: "\n\n"))
+            return .userText(RichText(raw: texts.joined(separator: "\n\n")))
         }
         if !toolResults.isEmpty {
             // Mixed (rare). Surface tool results; text fragments get dropped.
@@ -107,7 +107,7 @@ struct SessionEntryDecoder: Sendable {
         for block in blocks {
             switch block["type"] as? String {
             case "text":
-                if let t = block["text"] as? String { out.append(.text(t)) }
+                if let t = block["text"] as? String { out.append(.text(RichText(raw: t))) }
             case "thinking":
                 if let t = block["thinking"] as? String { out.append(.thinking(t)) }
             case "tool_use":

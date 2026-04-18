@@ -26,6 +26,11 @@ final class SessionMessageLoader: ObservableObject {
     private var backend: SessionFileBackend?
     private var topCursor: Int = 0
     private var watcher: DirectoryWatcher?
+    /// Last time a prepend batch *completed*. Used to short-circuit
+    /// back-to-back `loadOlderIfNeeded` calls that can happen when the
+    /// sentinel row's `.task` re-fires during layout flux after a prepend.
+    private var lastPrependCompletedAt: Date?
+    private static let prependCooldown: TimeInterval = 0.3
 
     init(windowSize: Int = 500) {
         self.windowSize = windowSize
@@ -76,8 +81,8 @@ final class SessionMessageLoader: ObservableObject {
 
     // MARK: - older batch
 
-    /// Safe to call from `.onAppear` of a top sentinel — guards against
-    /// concurrent or no-op invocations.
+    /// Safe to call from `.task` of a top sentinel — guards against
+    /// concurrent, no-op, and rapid-fire invocations.
     func loadOlderIfNeeded() {
         guard
             !isPrepending,
@@ -85,6 +90,11 @@ final class SessionMessageLoader: ObservableObject {
             let backend,
             currentSummary != nil
         else { return }
+
+        if let last = lastPrependCompletedAt,
+           Date().timeIntervalSince(last) < Self.prependCooldown {
+            return
+        }
 
         isPrepending = true
         let anchorID = entries.first?.id
@@ -104,6 +114,7 @@ final class SessionMessageLoader: ObservableObject {
             self.topCursor = newCursor
             self.hasMoreAtTop = newCursor > 0
             self.isPrepending = false
+            self.lastPrependCompletedAt = Date()
             if !older.isEmpty, let anchorID {
                 self.anchorRequest = anchorID
             }

@@ -41,7 +41,9 @@ struct SessionDetailView: View {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     if loader.hasMoreAtTop {
                         TopLoadSentinel(isLoading: loader.isPrepending)
-                            .onAppear { loader.loadOlderIfNeeded() }
+                            .task(id: loader.entries.first?.id) {
+                                loader.loadOlderIfNeeded()
+                            }
                             .id("top-sentinel")
                     }
                     ForEach(loader.entries) { entry in
@@ -50,6 +52,7 @@ struct SessionDetailView: View {
                 }
                 .padding(20)
             }
+            .textSelection(.enabled)
             .onChange(of: loader.anchorRequest) { _, newValue in
                 guard let id = newValue else { return }
                 var transaction = Transaction()
@@ -138,8 +141,8 @@ private struct MessageRow: View {
 
     var body: some View {
         switch entry.kind {
-        case .userText(let text):
-            UserTurnView(text: text, timestamp: entry.timestamp)
+        case .userText(let rich):
+            UserTurnView(text: rich, timestamp: entry.timestamp)
 
         case .userToolResults(let results):
             ToolResultBlock(results: results)
@@ -168,7 +171,7 @@ private struct MessageRow: View {
 // MARK: - user
 
 private struct UserTurnView: View {
-    let text: String
+    let text: RichText
     let timestamp: Date?
 
     var body: some View {
@@ -183,8 +186,7 @@ private struct UserTurnView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            MarkdownText(raw: text)
-                .textSelection(.enabled)
+            Text(text.markdown)
         }
         .padding(12)
         .background(.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
@@ -239,17 +241,16 @@ private struct AssistantBlockView: View {
 
     var body: some View {
         switch block {
-        case .text(let s):
-            MarkdownText(raw: s)
-                .textSelection(.enabled)
+        case .text(let rich):
+            Text(rich.markdown)
 
         case .thinking(let s):
             DisclosureGroup(isExpanded: $thinkingExpanded) {
                 Text(s)
                     .font(.callout.italic())
                     .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
                     .padding(.top, 4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             } label: {
                 Label("Thinking (\(s.count) chars)", systemImage: "brain")
                     .font(.caption.bold())
@@ -258,16 +259,12 @@ private struct AssistantBlockView: View {
 
         case .toolUse(_, let name, let preview):
             DisclosureGroup(isExpanded: $toolInputExpanded) {
-                ScrollView {
-                    Text(preview)
-                        .font(.caption.monospaced())
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
-                }
-                .frame(maxHeight: 280)
-                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
-                .padding(.top, 4)
+                Text(preview)
+                    .font(.caption.monospaced())
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
+                    .padding(.top, 4)
             } label: {
                 Label("Tool: \(name)", systemImage: "wrench.and.screwdriver")
                     .font(.caption.bold())
@@ -286,16 +283,12 @@ private struct ToolResultBlock: View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(results, id: \.toolUseId) { result in
                 DisclosureGroup(isExpanded: binding(for: result.toolUseId)) {
-                    ScrollView {
-                        Text(result.content.isEmpty ? "(empty result)" : result.content)
-                            .font(.caption.monospaced())
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(8)
-                    }
-                    .frame(maxHeight: 240)
-                    .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 6))
-                    .padding(.top, 4)
+                    Text(result.content.isEmpty ? "(empty result)" : result.content)
+                        .font(.caption.monospaced())
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 6))
+                        .padding(.top, 4)
                 } label: {
                     Label(
                         result.isError ? "Tool result (error)" : "Tool result",
@@ -360,22 +353,5 @@ private struct UsageFooter: View {
         }
         .font(.caption2.monospaced())
         .foregroundStyle(.tertiary)
-    }
-}
-
-// MARK: - markdown
-
-private struct MarkdownText: View {
-    let raw: String
-
-    var body: some View {
-        if let attributed = try? AttributedString(
-            markdown: raw,
-            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        ) {
-            Text(attributed)
-        } else {
-            Text(raw)
-        }
     }
 }

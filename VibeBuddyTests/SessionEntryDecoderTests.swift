@@ -14,11 +14,11 @@ struct SessionEntryDecoderTests {
         {"type":"user","uuid":"u1","timestamp":"2026-04-17T10:00:00.000Z","message":{"role":"user","content":"Hi there"}}
         """#)
         let entry = try! #require(decoder.decode(line))
-        guard case .userText(let text) = entry.kind else {
+        guard case .userText(let rich) = entry.kind else {
             Issue.record("expected .userText")
             return
         }
-        #expect(text == "Hi there")
+        #expect(rich.raw == "Hi there")
         #expect(entry.id == "u1")
         #expect(entry.timestamp != nil)
     }
@@ -70,7 +70,7 @@ struct SessionEntryDecoderTests {
         #expect(usage?.outputTokens == 42)
         #expect(blocks.count == 3)
         if case .thinking(let t) = blocks[0] { #expect(t == "reasoning...") } else { Issue.record("expected thinking block") }
-        if case .text(let t) = blocks[1] { #expect(t == "Here you go") } else { Issue.record("expected text block") }
+        if case .text(let rich) = blocks[1] { #expect(rich.raw == "Here you go") } else { Issue.record("expected text block") }
         if case .toolUse(let id, let name, let preview) = blocks[2] {
             #expect(id == "t1")
             #expect(name == "Bash")
