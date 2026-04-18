@@ -11,8 +11,14 @@ struct SessionDetailView: View {
     @State private var lastKnownCount: Int = 0
     /// Brief visual flash on pin engage/release. Visible for ~300 ms.
     @State private var snapPulse: Bool = false
+    /// Debounces the anchor's onDisappear so a brief layout shudder (when
+    /// a new entry is appended and LazyVStack re-lays out) doesn't flip
+    /// `isPinnedToBottom` to false long enough to kill the follow-latest
+    /// scroll that fires on the same change.
+    @State private var unpinTask: Task<Void, Never>?
 
     private static let bottomAnchorID = "bottom-anchor"
+    private static let unpinDebounce: Duration = .milliseconds(200)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -65,11 +71,25 @@ struct SessionDetailView: View {
                     // Invisible 1-pt tail anchor. LazyVStack only realizes
                     // it when the user is near the bottom, so
                     // onAppear / onDisappear drive `isPinnedToBottom`.
+                    // onDisappear is debounced because new-entry
+                    // appends cause a brief re-layout that can wink the
+                    // anchor out of the viewport for a single frame.
                     Color.clear
                         .frame(height: 1)
                         .id(Self.bottomAnchorID)
-                        .onAppear { isPinnedToBottom = true }
-                        .onDisappear { isPinnedToBottom = false }
+                        .onAppear {
+                            unpinTask?.cancel()
+                            unpinTask = nil
+                            isPinnedToBottom = true
+                        }
+                        .onDisappear {
+                            unpinTask?.cancel()
+                            unpinTask = Task { @MainActor in
+                                try? await Task.sleep(for: Self.unpinDebounce)
+                                guard !Task.isCancelled else { return }
+                                isPinnedToBottom = false
+                            }
+                        }
                 }
                 .padding(20)
             }
