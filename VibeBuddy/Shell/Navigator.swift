@@ -9,6 +9,8 @@ final class Navigator: ObservableObject {
     @Published var pendingPluginID: String?
     @Published var pendingSkillID: String?
     @Published var pendingCommandID: String?
+    @Published var pendingAgentID: String?
+    @Published var pendingMCPServerName: String?
 
     func openSession(id: SessionSummary.ID) {
         route = .sessions
@@ -28,5 +30,15 @@ final class Navigator: ObservableObject {
     func openCommand(id: String) {
         route = .prompts
         pendingCommandID = id
+    }
+
+    func openAgent(id: String) {
+        route = .subagents
+        pendingAgentID = id
+    }
+
+    func openMCPServer(name: String) {
+        route = .mcp
+        pendingMCPServerName = name
     }
 }

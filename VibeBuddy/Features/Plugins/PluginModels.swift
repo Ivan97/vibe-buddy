@@ -31,13 +31,18 @@ struct PluginContributions: Equatable, Sendable {
     let skills: [Resource]
     let commands: [Resource]
     let agents: [Resource]
+    /// MCP servers declared inline in the plugin's `plugin.json` under the
+    /// `mcpServers` field. `Resource.url` is the manifest file itself;
+    /// `name` is the server key.
+    let mcpServers: [Resource]
 
-    static let zero = PluginContributions(skills: [], commands: [], agents: [])
+    static let zero = PluginContributions(skills: [], commands: [], agents: [], mcpServers: [])
 
     var skillCount: Int { skills.count }
     var commandCount: Int { commands.count }
     var agentCount: Int { agents.count }
-    var total: Int { skillCount + commandCount + agentCount }
+    var mcpServerCount: Int { mcpServers.count }
+    var total: Int { skillCount + commandCount + agentCount + mcpServerCount }
 }
 
 /// A discovered plugin on disk. Identity = `<pluginName>@<marketplace>` which

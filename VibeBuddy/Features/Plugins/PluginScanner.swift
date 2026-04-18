@@ -37,7 +37,15 @@ struct PluginScanner: Sendable {
                 ? bundleRoot.deletingLastPathComponent().lastPathComponent
                 : manifest.name
             let identifier = "\(effectiveName)@\(marketplaceName)"
-            let contributions = scanContributions(in: bundleRoot)
+
+            // Pull mcpServers out of the raw manifest JSON — plugins can
+            // inline these under plugin.json's `mcpServers` key.
+            let mcpServerNames = Self.mcpServerNames(fromManifestURL: url)
+            let contributions = scanContributions(
+                in: bundleRoot,
+                manifestURL: url,
+                mcpServerNames: mcpServerNames
+            )
 
             out.append(
                 InstalledPlugin(
@@ -92,7 +100,11 @@ struct PluginScanner: Sendable {
         return tail.first ?? "unknown"
     }
 
-    private func scanContributions(in bundleRoot: URL) -> PluginContributions {
+    private func scanContributions(
+        in bundleRoot: URL,
+        manifestURL: URL,
+        mcpServerNames: [String]
+    ) -> PluginContributions {
         PluginContributions(
             skills: collect(
                 in: bundleRoot.appending(path: "skills", directoryHint: .isDirectory),
@@ -108,8 +120,31 @@ struct PluginScanner: Sendable {
                 in: bundleRoot.appending(path: "agents", directoryHint: .isDirectory),
                 matching: { $0.pathExtension == "md" },
                 name: { $0.deletingPathExtension().lastPathComponent }
-            )
+            ),
+            mcpServers: mcpServerNames
+                .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+                .map { name in
+                    PluginContributions.Resource(
+                        // Server names are the keys the user sees in MCP
+                        // mcpServers{}. Prefixed with manifest path to keep
+                        // ids globally unique across plugins that happen to
+                        // ship a server with the same name.
+                        id: "mcp:\(manifestURL.path)#\(name)",
+                        name: name,
+                        url: manifestURL
+                    )
+                }
         )
+    }
+
+    private static func mcpServerNames(fromManifestURL url: URL) -> [String] {
+        guard let data = try? Data(contentsOf: url),
+              let obj = try? JSONSerialization.jsonObject(with: data),
+              let dict = obj as? [String: Any],
+              let servers = dict["mcpServers"] as? [String: Any] else {
+            return []
+        }
+        return Array(servers.keys)
     }
 
     private func collect(

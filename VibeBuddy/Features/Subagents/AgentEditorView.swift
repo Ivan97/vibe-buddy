@@ -17,6 +17,7 @@ struct AgentEditorView: View {
         VStack(spacing: 0) {
             toolbar
             Divider()
+            scopeBanner
 
             if let err = loadError {
                 ContentUnavailableView(
@@ -81,22 +82,44 @@ struct AgentEditorView: View {
             .buttonStyle(.borderless)
             .help("Reveal in Finder")
 
-            Button(role: .destructive) {
-                showDeleteConfirm = true
-            } label: {
-                Image(systemName: "trash")
+            if handle.isEditable {
+                Button(role: .destructive) {
+                    showDeleteConfirm = true
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+                .help("Delete agent")
+
+                Button("Revert") { loadDocument() }
+                    .disabled(!isDirty)
+
+                Button("Save") { performSave() }
+                    .keyboardShortcut("s", modifiers: .command)
+                    .disabled(!isDirty || isSaving)
             }
-            .buttonStyle(.borderless)
-            .help("Delete agent")
-
-            Button("Revert") { loadDocument() }
-                .disabled(!isDirty)
-
-            Button("Save") { performSave() }
-                .keyboardShortcut("s", modifiers: .command)
-                .disabled(!isDirty || isSaving)
         }
         .padding(12)
+    }
+
+    @ViewBuilder
+    private var scopeBanner: some View {
+        if case .plugin(let marketplace, let pluginName) = handle.scope {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "lock.fill").foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Plugin-provided — read-only").font(.caption.bold())
+                    Text("Shipped by \(pluginName) · \(marketplace). Edits aren't saved from here.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(Color.orange.opacity(0.08))
+            .overlay(Rectangle().frame(height: 1).foregroundStyle(Color.orange.opacity(0.3)), alignment: .bottom)
+        }
     }
 
     // MARK: - editor

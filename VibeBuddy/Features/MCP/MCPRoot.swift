@@ -14,6 +14,7 @@ struct MCPRoot: View {
 
 private struct MCPShell: View {
     @ObservedObject var store: MCPStore
+    @EnvironmentObject private var navigator: Navigator
 
     @State private var editing: [MCPServer] = []
     @State private var original: [MCPServer] = []
@@ -43,7 +44,9 @@ private struct MCPShell: View {
                 editing = new
                 original = new
             }
+            consumePendingOpen()
         }
+        .onChange(of: navigator.pendingMCPServerName) { _, _ in consumePendingOpen() }
         .sheet(isPresented: $showNewSheet) {
             NewMCPServerSheet(existingNames: Set(editing.map(\.name))) { server in
                 editing.append(server)
@@ -133,6 +136,14 @@ private struct MCPShell: View {
                 }
             }
             .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private func consumePendingOpen() {
+        guard let name = navigator.pendingMCPServerName else { return }
+        if editing.contains(where: { $0.name == name }) {
+            selectedName = name
+            navigator.pendingMCPServerName = nil
         }
     }
 

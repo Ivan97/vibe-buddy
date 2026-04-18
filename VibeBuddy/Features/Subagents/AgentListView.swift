@@ -25,21 +25,8 @@ struct AgentListView: View {
             }
 
             List(selection: $selected) {
-                Section {
-                    ForEach(handles) { handle in
-                        AgentRow(handle: handle)
-                            .tag(handle.id as AgentHandle.ID?)
-                    }
-                } header: {
-                    HStack {
-                        Image(systemName: "globe")
-                        Text("Global").font(.caption.bold())
-                        Spacer()
-                        Text("\(handles.count)\(searchText.isEmpty ? "" : " / \(totalCount)")")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                userSection
+                pluginSection
             }
             .listStyle(.sidebar)
             .overlay {
@@ -59,6 +46,86 @@ struct AgentListView: View {
             Divider()
             footerBar
         }
+    }
+
+    @ViewBuilder
+    private var userSection: some View {
+        let items = handles.filter {
+            if case .user = $0.scope { return true }
+            return false
+        }
+        if !items.isEmpty {
+            Section {
+                ForEach(items) { handle in
+                    AgentRow(handle: handle)
+                        .tag(handle.id as AgentHandle.ID?)
+                }
+            } header: {
+                HStack {
+                    Image(systemName: "person.circle")
+                    Text("User").font(.caption.bold())
+                    Spacer()
+                    Text("\(items.count)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var pluginSection: some View {
+        let items = handles.filter {
+            if case .plugin = $0.scope { return true }
+            return false
+        }
+        if !items.isEmpty {
+            Section {
+                ForEach(pluginGroups(for: items), id: \.plugin) { group in
+                    DisclosureGroup {
+                        ForEach(group.agents) { handle in
+                            AgentRow(handle: handle)
+                                .tag(handle.id as AgentHandle.ID?)
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "puzzlepiece.extension")
+                                .foregroundStyle(.secondary)
+                            Text(group.plugin)
+                                .font(.caption.bold())
+                            Spacer()
+                            Text("\(group.agents.count)")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+            } header: {
+                HStack {
+                    Image(systemName: "puzzlepiece.extension")
+                    Text("Plugin-provided").font(.caption.bold())
+                    Spacer()
+                    Text("\(items.count)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private struct PluginGroup {
+        let plugin: String
+        let agents: [AgentHandle]
+    }
+
+    private func pluginGroups(for items: [AgentHandle]) -> [PluginGroup] {
+        let grouped = Dictionary(grouping: items) { handle -> String in
+            if case .plugin(_, let plugin) = handle.scope { return plugin }
+            return "unknown"
+        }
+        return grouped
+            .map { PluginGroup(plugin: $0.key, agents: $0.value) }
+            .sorted { $0.plugin.localizedCaseInsensitiveCompare($1.plugin) == .orderedAscending }
     }
 
     private var searchBar: some View {
@@ -94,19 +161,34 @@ struct AgentListView: View {
 
 private struct AgentRow: View {
     let handle: AgentHandle
+    @EnvironmentObject private var navigator: Navigator
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(handle.name)
-                .font(.body)
-                .lineLimit(1)
+            HStack(spacing: 6) {
+                Text(handle.name)
+                    .font(.body)
+                    .lineLimit(1)
+                if case .plugin = handle.scope {
+                    Image(systemName: "lock.fill")
+                        .foregroundStyle(.tertiary)
+                        .font(.caption2)
+                }
+            }
             if !handle.description.isEmpty {
                 Text(handle.description)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(handle.isEditable ? .secondary : .tertiary)
                     .lineLimit(2)
             }
         }
         .padding(.vertical, 2)
+        .contextMenu {
+            if let pluginID = handle.pluginID {
+                Button("Show plugin") {
+                    navigator.openPlugin(id: pluginID)
+                }
+            }
+        }
     }
 }

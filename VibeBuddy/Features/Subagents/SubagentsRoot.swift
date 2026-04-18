@@ -16,6 +16,7 @@ struct SubagentsRoot: View {
 
 private struct SubagentsShell: View {
     @ObservedObject var store: AgentStore
+    @EnvironmentObject private var navigator: Navigator
     @State private var selectedID: AgentHandle.ID?
     @State private var searchText: String = ""
     @State private var showNewAgentSheet = false
@@ -49,6 +50,17 @@ private struct SubagentsShell: View {
                 selectedID = handle.id
                 showNewAgentSheet = false
             }
+        }
+        .onAppear(perform: consumePendingOpen)
+        .onChange(of: navigator.pendingAgentID) { _, _ in consumePendingOpen() }
+        .onChange(of: store.handles) { _, _ in consumePendingOpen() }
+    }
+
+    private func consumePendingOpen() {
+        guard let id = navigator.pendingAgentID else { return }
+        if store.handles.contains(where: { $0.id == id }) {
+            selectedID = id
+            navigator.pendingAgentID = nil
         }
     }
 

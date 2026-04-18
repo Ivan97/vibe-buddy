@@ -131,11 +131,20 @@ struct PluginDetailView: View {
                         icon: "person.2",
                         items: plugin.contributions.agents,
                         prefix: "",
-                        jumpHint: "— agent browsing from Plugins not yet linked"
-                    ) { _ in
-                        // Agents module doesn't yet merge plugin-provided
-                        // agents into its store; leaving as no-op until it
-                        // does.
+                        jumpHint: "Subagents module"
+                    ) { resource in
+                        navigator.openAgent(id: resource.id)
+                    }
+                }
+                if !plugin.contributions.mcpServers.isEmpty {
+                    ContributionGroup(
+                        title: "MCP servers",
+                        icon: "bolt.horizontal",
+                        items: plugin.contributions.mcpServers,
+                        prefix: "",
+                        jumpHint: "MCP module"
+                    ) { resource in
+                        navigator.openMCPServer(name: resource.name)
                     }
                 }
             }
