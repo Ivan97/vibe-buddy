@@ -33,17 +33,18 @@ private struct PromptsShell: View {
                 onNewCommand: { showNewSheet = true },
                 onRefresh: { Task { await store.reload() } }
             )
-            .frame(minWidth: 280, idealWidth: 340, maxWidth: 420)
+            .frame(minWidth: 280, idealWidth: 400)
 
             Group {
                 if let handle = selectedHandle {
+                    // No .id — see SessionListView note: forcing fresh
+                    // identity resets HSplitView's divider on every pick.
                     CommandEditorView(store: store, handle: handle)
-                        .id(handle.id)
                 } else {
                     EmptyDetailView()
                 }
             }
-            .frame(minWidth: 460, maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 400, maxHeight: .infinity)
         }
         .sheet(isPresented: $showNewSheet) {
             NewCommandSheet(store: store) { handle in

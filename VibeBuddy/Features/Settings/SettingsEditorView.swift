@@ -36,7 +36,7 @@ struct SettingsEditorView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear(perform: load)
+        .onChange(of: target, initial: true) { _, _ in load() }
         .sheet(isPresented: Binding(
             get: { pendingSave != nil },
             set: { if !$0 { pendingSave = nil } }

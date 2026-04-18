@@ -35,7 +35,7 @@ struct SkillEditorView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear(perform: loadDocument)
+        .onChange(of: handle.id, initial: true) { _, _ in loadDocument() }
         .alert("Delete \(handle.name)?", isPresented: $showDeleteConfirm) {
             Button("Delete", role: .destructive) { performDelete() }
             Button("Cancel", role: .cancel) {}

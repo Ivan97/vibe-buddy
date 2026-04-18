@@ -101,7 +101,7 @@ private struct HooksShell: View {
     private var content: some View {
         HSplitView {
             EventSidebar(editing: $editing, selected: $selectedEventName)
-                .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
+                .frame(minWidth: 220, idealWidth: 380)
 
             Group {
                 if let name = selectedEventName {
@@ -113,7 +113,7 @@ private struct HooksShell: View {
                     )
                 }
             }
-            .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 400, maxHeight: .infinity)
         }
     }
 

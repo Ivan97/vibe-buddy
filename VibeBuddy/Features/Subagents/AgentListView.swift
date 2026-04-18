@@ -180,9 +180,11 @@ private struct AgentRow: View {
                     .font(.caption)
                     .foregroundStyle(handle.isEditable ? .secondary : .tertiary)
                     .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contextMenu {
             if let pluginID = handle.pluginID {
                 Button("Show plugin") {

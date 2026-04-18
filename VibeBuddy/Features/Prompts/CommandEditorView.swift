@@ -32,7 +32,7 @@ struct CommandEditorView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear(perform: loadDocument)
+        .onChange(of: handle.id, initial: true) { _, _ in loadDocument() }
         .alert("Delete /\(handle.invocationSlug)?", isPresented: $showDeleteConfirm) {
             Button("Delete", role: .destructive) { performDelete() }
             Button("Cancel", role: .cancel) {}

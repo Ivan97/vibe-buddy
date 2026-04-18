@@ -33,17 +33,18 @@ private struct SubagentsShell: View {
                 onNewAgent: { showNewAgentSheet = true },
                 onRefresh: { Task { await store.reload() } }
             )
-            .frame(minWidth: 260, idealWidth: 320, maxWidth: 400)
+            .frame(minWidth: 260, idealWidth: 400)
 
             Group {
                 if let handle = selectedHandle {
+                    // No .id — see SessionListView note: forcing fresh
+                    // identity resets HSplitView's divider on every pick.
                     AgentEditorView(store: store, handle: handle)
-                        .id(handle.id)
                 } else {
                     EmptyDetailView()
                 }
             }
-            .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 400, maxHeight: .infinity)
         }
         .sheet(isPresented: $showNewAgentSheet) {
             NewAgentSheet(store: store) { handle in

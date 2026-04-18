@@ -117,7 +117,7 @@ private struct MCPShell: View {
                 onNew: { showNewSheet = true },
                 onDelete: deleteSelected
             )
-            .frame(minWidth: 220, idealWidth: 260, maxWidth: 340)
+            .frame(minWidth: 220, idealWidth: 380)
 
             Group {
                 if let idx = editing.firstIndex(where: { $0.name == selectedName }) {
@@ -135,7 +135,7 @@ private struct MCPShell: View {
                     )
                 }
             }
-            .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 400, maxHeight: .infinity)
         }
     }
 

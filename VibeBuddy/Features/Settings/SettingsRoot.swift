@@ -22,11 +22,12 @@ private struct SettingsShell: View {
                 files: SettingsTarget.allCases.map { store.files[$0] ?? .placeholder(for: $0) },
                 selected: $selected
             )
-            .frame(minWidth: 260, idealWidth: 300, maxWidth: 360)
+            .frame(minWidth: 260, idealWidth: 400)
 
+            // No .id(selected) — that would reset the HSplitView divider
+            // on every target switch. Editor reloads via onChange.
             SettingsEditorView(store: store, target: selected)
-                .id(selected)
-                .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
+                .frame(minWidth: 400, maxHeight: .infinity)
         }
     }
 }

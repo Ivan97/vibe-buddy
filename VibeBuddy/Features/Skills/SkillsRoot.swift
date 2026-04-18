@@ -16,10 +16,36 @@ struct SkillsRoot: View {
 
 private struct SkillsShell: View {
     @ObservedObject var store: SkillStore
+    @EnvironmentObject private var pluginsStore: PluginsStore
     @EnvironmentObject private var navigator: Navigator
     @State private var selectedID: SkillHandle.ID?
     @State private var searchText: String = ""
     @State private var showNewSkillSheet = false
+
+    /// Resolve a handle's update status against the right store:
+    /// plugin-scope piggy-backs on `PluginsStore`, userSymlink checks
+    /// live in `SkillStore`, everything else reports nothing.
+    private func status(for handle: SkillHandle) -> GitUpdateChecker.Status {
+        switch handle.scope {
+        case .userSymlink:
+            return store.status(for: handle.id)
+        case .plugin:
+            guard let pluginID = handle.pluginID else { return .unchecked }
+            return pluginsStore.status(for: pluginID)
+        case .user, .malformed:
+            return .unchecked
+        }
+    }
+
+    /// "Check updates" in Skills fans out to both stores so plugin-scope
+    /// badges light up alongside symlinked ones.
+    private func checkAllUpdates() {
+        Task {
+            async let skills: Void = store.checkAllForUpdates()
+            async let plugins: Void = pluginsStore.checkAllForUpdates()
+            _ = await (skills, plugins)
+        }
+    }
 
     var body: some View {
         HSplitView {
@@ -29,21 +55,26 @@ private struct SkillsShell: View {
                 searchText: $searchText,
                 totalCount: store.handles.count,
                 isLoading: store.isLoading,
+                isCheckingUpdates: store.isCheckingUpdates || pluginsStore.isCheckingUpdates,
+                updateStatus: status,
                 error: store.loadError,
                 onNewSkill: { showNewSkillSheet = true },
-                onRefresh: { Task { await store.reload() } }
+                onRefresh: { Task { await store.reload() } },
+                onCheckUpdates: checkAllUpdates
             )
-            .frame(minWidth: 280, idealWidth: 340, maxWidth: 420)
+            .frame(minWidth: 280, idealWidth: 400)
 
             Group {
                 if let handle = selectedHandle {
+                    // No .id(handle.id) — that would give HSplitView a
+                    // fresh child on every selection change and reset the
+                    // divider. Editor observes handle.id internally.
                     SkillEditorView(store: store, handle: handle)
-                        .id(handle.id)
                 } else {
                     EmptyDetailView()
                 }
             }
-            .frame(minWidth: 460, maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 400, maxHeight: .infinity)
         }
         .sheet(isPresented: $showNewSkillSheet) {
             NewSkillSheet(store: store) { handle in
