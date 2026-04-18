@@ -5,16 +5,16 @@ struct SessionDetailView: View {
     let summary: SessionSummary
     @StateObject private var loader = SessionMessageLoader()
 
-    /// True when the user's viewport includes the tail anchor — i.e.
-    /// they're currently looking at the latest messages.
+    /// True when the scrolled-to position is (close to) the last entry.
+    /// Drives the magnetic glow + haptic snap. Follow-latest scrolling is
+    /// handled natively by `.defaultScrollAnchor(.bottom)`; this state is
+    /// only a signal for feedback UI.
     @State private var isPinnedToBottom: Bool = true
-    @State private var lastKnownCount: Int = 0
     /// Brief visual flash on pin engage/release. Visible for ~300 ms.
     @State private var snapPulse: Bool = false
     /// Debounces the anchor's onDisappear so a brief layout shudder (when
-    /// a new entry is appended and LazyVStack re-lays out) doesn't flip
-    /// `isPinnedToBottom` to false long enough to kill the follow-latest
-    /// scroll that fires on the same change.
+    /// a new entry is appended and LazyVStack re-lays out) doesn't
+    /// spuriously flip the pinned-state signal.
     @State private var unpinTask: Task<Void, Never>?
 
     private static let bottomAnchorID = "bottom-anchor"
@@ -133,31 +133,8 @@ struct SessionDetailView: View {
                 }
                 loader.anchorRequest = nil
             }
-            .onChange(of: loader.entries.count) { _, newCount in
-                handleCountChange(newCount: newCount, proxy: proxy)
-            }
             .onChange(of: isPinnedToBottom) { _, _ in
                 triggerSnapFeedback()
-            }
-        }
-    }
-
-    private func handleCountChange(newCount: Int, proxy: ScrollViewProxy) {
-        let delta = newCount - lastKnownCount
-        lastKnownCount = newCount
-        guard delta > 0 else { return }
-
-        // Only follow when the user's already at the bottom. Scrolled-up
-        // readers stay exactly where they are — no jump button, no nudge.
-        guard isPinnedToBottom else { return }
-
-        // Defer one run-loop tick so LazyVStack has laid out the new rows
-        // before we scroll; otherwise `scrollTo` lands based on the stale
-        // (pre-append) content size.
-        DispatchQueue.main.async {
-            let target: String = loader.entries.last?.id ?? Self.bottomAnchorID
-            withAnimation(.easeOut(duration: 0.2)) {
-                proxy.scrollTo(target, anchor: .bottom)
             }
         }
     }
