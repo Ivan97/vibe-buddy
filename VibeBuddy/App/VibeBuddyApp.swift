@@ -6,6 +6,7 @@ struct VibeBuddyApp: App {
     @StateObject private var updater = SparkleUpdaterController()
     @StateObject private var sessionStore = SessionStore()
     @StateObject private var agentStore = AgentStore()
+    @StateObject private var skillStore = SkillStore()
     @StateObject private var navigator = Navigator()
 
     var body: some Scene {
@@ -13,6 +14,7 @@ struct VibeBuddyApp: App {
             updater: updater,
             sessionStore: sessionStore,
             agentStore: agentStore,
+            skillStore: skillStore,
             navigator: navigator
         )
         MenuBarScene(

@@ -41,8 +41,8 @@ enum ModuleRoute: String, CaseIterable, Identifiable, Hashable, Sendable {
     /// Phase in which this module ships its real feature (0 = already live).
     var phase: Int {
         switch self {
-        case .sessions, .subagents:            return 0
-        case .prompts, .skills:                return 1
+        case .sessions, .subagents, .skills:   return 0
+        case .prompts:                         return 1
         case .statusline, .mcp, .hooks:        return 2
         case .plugins:                         return 3
         }

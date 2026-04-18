@@ -4,6 +4,7 @@ struct MainWindowScene: Scene {
     @ObservedObject var updater: SparkleUpdaterController
     @ObservedObject var sessionStore: SessionStore
     @ObservedObject var agentStore: AgentStore
+    @ObservedObject var skillStore: SkillStore
     @ObservedObject var navigator: Navigator
 
     var body: some Scene {
@@ -12,6 +13,7 @@ struct MainWindowScene: Scene {
                 .environmentObject(updater)
                 .environmentObject(sessionStore)
                 .environmentObject(agentStore)
+                .environmentObject(skillStore)
                 .environmentObject(navigator)
                 .frame(minWidth: 840, minHeight: 520)
                 .task {

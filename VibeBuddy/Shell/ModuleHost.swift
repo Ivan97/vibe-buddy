@@ -10,7 +10,9 @@ struct ModuleHost: View {
                 SessionsRoot()
             case .subagents:
                 SubagentsRoot()
-            case .prompts, .skills,
+            case .skills:
+                SkillsRoot()
+            case .prompts,
                  .statusline, .mcp, .hooks,
                  .plugins:
                 ComingSoonView(route: route!)
