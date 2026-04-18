@@ -4,8 +4,10 @@ struct SessionDetailView: View {
     let summary: SessionSummary
     @StateObject private var loader = SessionMessageLoader()
 
+    /// User is currently viewing the bottom of the transcript (close to it).
+    /// When true, new entries auto-scroll the viewport; when false, they
+    /// feed the "N new" counter instead.
     @State private var isPinnedToBottom: Bool = true
-    @State private var hasDoneInitialScroll: Bool = false
     @State private var lastKnownCount: Int = 0
     @State private var unreadNew: Int = 0
 
@@ -37,21 +39,7 @@ struct SessionDetailView: View {
                 }
             }
         }
-        .onAppear {
-            loader.load(summary)
-            resetFollowState()
-        }
-        .onChange(of: summary) { _, new in
-            loader.load(new)
-            resetFollowState()
-        }
-    }
-
-    private func resetFollowState() {
-        isPinnedToBottom = true
-        hasDoneInitialScroll = false
-        lastKnownCount = 0
-        unreadNew = 0
+        .onAppear { loader.load(summary) }
     }
 
     @ViewBuilder
@@ -62,18 +50,15 @@ struct SessionDetailView: View {
                     LazyVStack(alignment: .leading, spacing: 12) {
                         if loader.hasMoreAtTop {
                             TopLoadSentinel(isLoading: loader.isPrepending)
-                                .task(id: loader.entries.first?.id) {
-                                    loader.loadOlderIfNeeded()
-                                }
+                                .onAppear { loader.loadOlderIfNeeded() }
                                 .id("top-sentinel")
                         }
                         ForEach(loader.entries) { entry in
                             MessageRow(entry: entry).id(entry.id)
                         }
-                        // Invisible 1-pt bottom anchor. LazyVStack realizes
-                        // it only when the user is at the bottom, so
-                        // onAppear / onDisappear give us a cheap
-                        // "is-the-user-pinned" signal.
+                        // Invisible 1-pt tail anchor. LazyVStack only
+                        // realizes it when the user is at the bottom, so
+                        // onAppear / onDisappear drive `isPinnedToBottom`.
                         Color.clear
                             .frame(height: 1)
                             .id(Self.bottomAnchorID)
@@ -87,6 +72,7 @@ struct SessionDetailView: View {
                     }
                     .padding(20)
                 }
+                .defaultScrollAnchor(.bottom)      // initial position + resize anchor
                 .textSelection(.enabled)
                 .onChange(of: loader.anchorRequest) { _, newValue in
                     guard let id = newValue else { return }
@@ -113,9 +99,7 @@ struct SessionDetailView: View {
     @ViewBuilder
     private func jumpToLatestButton(proxy: ScrollViewProxy) -> some View {
         Button {
-            withAnimation(.easeOut(duration: 0.2)) {
-                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
-            }
+            scrollToBottom(proxy: proxy, animated: true)
             unreadNew = 0
         } label: {
             HStack(spacing: 6) {
@@ -136,32 +120,36 @@ struct SessionDetailView: View {
     private func handleCountChange(newCount: Int, proxy: ScrollViewProxy) {
         let delta = newCount - lastKnownCount
         lastKnownCount = newCount
-
-        // First time entries show up: scroll to the bottom so the user
-        // lands on the latest turn rather than the top of the decoded
-        // window (500 entries back from the end).
-        if !hasDoneInitialScroll, newCount > 0 {
-            hasDoneInitialScroll = true
-            DispatchQueue.main.async {
-                var txn = Transaction()
-                txn.disablesAnimations = true
-                withTransaction(txn) {
-                    proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
-                }
-            }
-            return
-        }
-
         guard delta > 0 else { return }
 
         if isPinnedToBottom {
-            // Follow-latest: scroll the newly appended rows into view.
-            withAnimation(.easeOut(duration: 0.2)) {
-                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+            // Defer one run-loop tick so LazyVStack has laid out the new
+            // rows before we scroll — otherwise `scrollTo` lands at a
+            // position computed from stale content size.
+            DispatchQueue.main.async {
+                scrollToBottom(proxy: proxy, animated: true)
             }
         } else {
-            // User is reading history; accumulate for the jump button.
             unreadNew += delta
+        }
+    }
+
+    private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool) {
+        // Prefer scrolling to the concrete last entry — it's the newest
+        // message and scrolling to it with `.bottom` anchor keeps it
+        // flush with the viewport bottom. The 1-pt anchor is a fallback
+        // for the very first render while `entries.last` is nil.
+        let target: String = loader.entries.last?.id ?? Self.bottomAnchorID
+        if animated {
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo(target, anchor: .bottom)
+            }
+        } else {
+            var txn = Transaction()
+            txn.disablesAnimations = true
+            withTransaction(txn) {
+                proxy.scrollTo(target, anchor: .bottom)
+            }
         }
     }
 }

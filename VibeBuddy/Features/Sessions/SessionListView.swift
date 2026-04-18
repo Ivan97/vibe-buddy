@@ -33,6 +33,7 @@ struct SessionListDetailView: View {
             Group {
                 if let summary = selectedSummary {
                     SessionDetailView(summary: summary)
+                        .id(summary.id)   // fresh state per session switch
                 } else {
                     VStack(spacing: 8) {
                         Image(systemName: "text.alignleft")
