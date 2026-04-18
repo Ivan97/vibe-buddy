@@ -15,14 +15,28 @@ struct PluginManifest: Equatable, Sendable {
     let extras: [String: String]
 }
 
-/// Count of things a plugin contributes, inferred by scanning its bundle.
+/// What a plugin contributes, inferred by scanning its bundle. Stores the
+/// resolved paths so the detail view can render clickable item lists
+/// (and set `Navigator.pendingSkillID` / `pendingCommandID` on click).
 struct PluginContributions: Equatable, Sendable {
-    let skillCount: Int
-    let commandCount: Int
-    let agentCount: Int
+    /// One discovered contribution. `id` matches the corresponding handle
+    /// id in the target module (SkillHandle / CommandHandle), so setting
+    /// `Navigator.pendingXxxID = resource.id` selects it on jump.
+    struct Resource: Identifiable, Equatable, Sendable {
+        let id: String
+        let name: String
+        let url: URL
+    }
 
-    static let zero = PluginContributions(skillCount: 0, commandCount: 0, agentCount: 0)
+    let skills: [Resource]
+    let commands: [Resource]
+    let agents: [Resource]
 
+    static let zero = PluginContributions(skills: [], commands: [], agents: [])
+
+    var skillCount: Int { skills.count }
+    var commandCount: Int { commands.count }
+    var agentCount: Int { agents.count }
     var total: Int { skillCount + commandCount + agentCount }
 }
 

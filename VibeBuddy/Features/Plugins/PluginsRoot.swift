@@ -16,6 +16,7 @@ struct PluginsRoot: View {
 
 private struct PluginsShell: View {
     @ObservedObject var store: PluginsStore
+    @EnvironmentObject private var navigator: Navigator
     @State private var selectedID: InstalledPlugin.ID?
     @State private var searchText: String = ""
     @State private var diffPair: DiffPair?
@@ -64,6 +65,17 @@ private struct PluginsShell: View {
                     onConfirm: { commit(pair) }
                 )
             }
+        }
+        .onAppear(perform: consumePendingOpen)
+        .onChange(of: navigator.pendingPluginID) { _, _ in consumePendingOpen() }
+        .onChange(of: store.plugins) { _, _ in consumePendingOpen() }
+    }
+
+    private func consumePendingOpen() {
+        guard let id = navigator.pendingPluginID else { return }
+        if store.plugins.contains(where: { $0.id == id }) {
+            selectedID = id
+            navigator.pendingPluginID = nil
         }
     }
 

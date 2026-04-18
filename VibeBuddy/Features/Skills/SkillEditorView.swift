@@ -123,12 +123,12 @@ struct SkillEditorView: View {
                 title: "This skill is a symlink",
                 message: "Edits land at \(target.path(percentEncoded: false))"
             )
-        case .plugin(let pluginName):
+        case .plugin(let marketplace, let pluginName):
             Banner(
                 icon: "lock.fill",
                 tone: .warning,
                 title: "Plugin-provided — read-only",
-                message: "This skill ships with \(pluginName). Edits aren't saved from here."
+                message: "This skill ships with \(pluginName) · \(marketplace). Edits aren't saved from here."
             )
         case .malformed:
             EmptyView()    // handled as a content-level view below

@@ -16,6 +16,7 @@ struct SkillsRoot: View {
 
 private struct SkillsShell: View {
     @ObservedObject var store: SkillStore
+    @EnvironmentObject private var navigator: Navigator
     @State private var selectedID: SkillHandle.ID?
     @State private var searchText: String = ""
     @State private var showNewSkillSheet = false
@@ -49,6 +50,17 @@ private struct SkillsShell: View {
                 selectedID = handle.id
                 showNewSkillSheet = false
             }
+        }
+        .onAppear(perform: consumePendingOpen)
+        .onChange(of: navigator.pendingSkillID) { _, _ in consumePendingOpen() }
+        .onChange(of: store.handles) { _, _ in consumePendingOpen() }
+    }
+
+    private func consumePendingOpen() {
+        guard let id = navigator.pendingSkillID else { return }
+        if store.handles.contains(where: { $0.id == id }) {
+            selectedID = id
+            navigator.pendingSkillID = nil
         }
     }
 

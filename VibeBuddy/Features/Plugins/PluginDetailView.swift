@@ -3,6 +3,7 @@ import SwiftUI
 struct PluginDetailView: View {
     let plugin: InstalledPlugin
     let onToggle: (Bool) -> Void
+    @EnvironmentObject private var navigator: Navigator
 
     var body: some View {
         ScrollView {
@@ -94,29 +95,49 @@ struct PluginDetailView: View {
     }
 
     private var contributionsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 14) {
             Text("Contributions").font(.headline)
-            HStack(spacing: 14) {
-                ContributionChip(
-                    icon: "wand.and.stars",
-                    count: plugin.contributions.skillCount,
-                    label: "skills"
-                )
-                ContributionChip(
-                    icon: "text.quote",
-                    count: plugin.contributions.commandCount,
-                    label: "commands"
-                )
-                ContributionChip(
-                    icon: "person.2",
-                    count: plugin.contributions.agentCount,
-                    label: "agents"
-                )
-            }
+
             if plugin.contributions.total == 0 {
                 Text("This plugin doesn't ship any discoverable skills / commands / agents under its bundle directories.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
+            } else {
+                if !plugin.contributions.skills.isEmpty {
+                    ContributionGroup(
+                        title: "Skills",
+                        icon: "wand.and.stars",
+                        items: plugin.contributions.skills,
+                        prefix: "",
+                        jumpHint: "Skills module"
+                    ) { resource in
+                        navigator.openSkill(id: resource.id)
+                    }
+                }
+                if !plugin.contributions.commands.isEmpty {
+                    ContributionGroup(
+                        title: "Commands",
+                        icon: "text.quote",
+                        items: plugin.contributions.commands,
+                        prefix: "/",
+                        jumpHint: "Prompts module"
+                    ) { resource in
+                        navigator.openCommand(id: resource.id)
+                    }
+                }
+                if !plugin.contributions.agents.isEmpty {
+                    ContributionGroup(
+                        title: "Agents",
+                        icon: "person.2",
+                        items: plugin.contributions.agents,
+                        prefix: "",
+                        jumpHint: "— agent browsing from Plugins not yet linked"
+                    ) { _ in
+                        // Agents module doesn't yet merge plugin-provided
+                        // agents into its store; leaving as no-op until it
+                        // does.
+                    }
+                }
             }
         }
     }
@@ -189,34 +210,77 @@ struct PluginDetailView: View {
     }
 }
 
-private struct ContributionChip: View {
+/// Collapsible list of a plugin's contributed resources. Each item is
+/// clickable and calls the supplied action (typically
+/// `navigator.openSkill/openCommand`).
+private struct ContributionGroup: View {
+    let title: String
     let icon: String
-    let count: Int
-    let label: String
+    let items: [PluginContributions.Resource]
+    let prefix: String
+    let jumpHint: String
+    let onOpen: (PluginContributions.Resource) -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .foregroundStyle(count > 0 ? .primary : .tertiary)
-            VStack(alignment: .leading, spacing: 0) {
-                Text("\(count)")
-                    .font(.title3.monospacedDigit().bold())
-                    .foregroundStyle(count > 0 ? .primary : .tertiary)
-                Text(label)
-                    .font(.caption2)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
                     .foregroundStyle(.secondary)
+                Text("\(title) · \(items.count)")
+                    .font(.subheadline.bold())
+                Spacer()
+                Text(jumpHint)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
+
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(items) { item in
+                    ContributionItemRow(
+                        title: prefix + item.name,
+                        onOpen: { onOpen(item) }
+                    )
+                }
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.secondary.opacity(0.06))
+            )
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(count > 0 ? Color.secondary.opacity(0.08) : Color.clear)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(.separator)
-        )
+    }
+}
+
+private struct ContributionItemRow: View {
+    let title: String
+    let onOpen: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: onOpen) {
+            HStack(spacing: 6) {
+                Text(title)
+                    .font(.callout.monospaced())
+                    .foregroundStyle(.primary)
+                Spacer()
+                if hovered {
+                    Image(systemName: "arrow.up.forward.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(hovered ? Color.accentColor.opacity(0.15) : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
     }
 }
 

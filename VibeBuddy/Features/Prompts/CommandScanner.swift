@@ -50,11 +50,15 @@ struct CommandScanner: Sendable {
 
         var result: [CommandHandle] = []
         for dir in commandsDirs {
-            let pluginName = Self.pluginName(for: dir, pluginsRoot: root)
+            let (marketplace, pluginName) = Self.pluginIdentity(for: dir, pluginsRoot: root)
             let files = collectMarkdown(at: dir)
             for url in files {
                 let namespace = namespaceComponents(of: url, relativeTo: dir)
-                if let handle = makeHandle(url: url, namespace: namespace, scope: .plugin(pluginName: pluginName)) {
+                if let handle = makeHandle(
+                    url: url,
+                    namespace: namespace,
+                    scope: .plugin(marketplace: marketplace, pluginName: pluginName)
+                ) {
                     result.append(handle)
                 }
             }
@@ -152,12 +156,19 @@ struct CommandScanner: Sendable {
         return ""
     }
 
-    private static func pluginName(for commandsDir: URL, pluginsRoot: URL) -> String {
+    /// Expected layout: `cache/<marketplace>/<plugin>/<version>/commands/`.
+    /// Falls back to unknown/unknown for malformed paths.
+    private static func pluginIdentity(for commandsDir: URL, pluginsRoot: URL) -> (marketplace: String, plugin: String) {
         let full = commandsDir.standardizedFileURL.pathComponents
         let root = pluginsRoot.standardizedFileURL.pathComponents
-        guard full.count > root.count else { return "unknown" }
+        guard full.count > root.count else { return ("unknown", "unknown") }
         let tail = Array(full.dropFirst(root.count))
-        if tail.first == "cache", tail.count > 1 { return tail[1] }
-        return tail.first ?? "unknown"
+        if tail.first == "cache" {
+            let marketplace = tail.count > 1 ? tail[1] : "unknown"
+            let plugin = tail.count > 2 ? tail[2] : marketplace
+            return (marketplace, plugin)
+        }
+        let first = tail.first ?? "unknown"
+        return (first, first)
     }
 }

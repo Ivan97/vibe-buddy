@@ -16,11 +16,23 @@ struct SkillHandle: Identifiable, Hashable, Sendable {
         case user
         /// `~/.claude/skills/<name>` is a symlink; edits land at `target`.
         case userSymlink(target: URL)
-        /// Shipped by a plugin at `~/.claude/plugins/cache/<plugin>/.../`.
-        case plugin(pluginName: String)
+        /// Shipped by a plugin at
+        /// `~/.claude/plugins/cache/<marketplace>/<plugin>/.../`.
+        case plugin(marketplace: String, pluginName: String)
         /// Entry that's in `~/.claude/skills/` but not a usable skill:
         /// a loose file, empty directory, missing SKILL.md, etc.
         case malformed(reason: String)
+    }
+
+    /// Corresponding `InstalledPlugin.id` when this skill is plugin-provided.
+    /// Handy for the 'Show plugin' jump: set
+    /// `Navigator.pendingPluginID = pluginID` after switching to the plugins
+    /// route.
+    var pluginID: String? {
+        if case .plugin(let marketplace, let name) = scope {
+            return "\(name)@\(marketplace)"
+        }
+        return nil
     }
 
     /// Whether the skill should expose a Save button. Plugin-provided and

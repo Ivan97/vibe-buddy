@@ -135,8 +135,11 @@ struct SkillListView: View {
     }
 
     private func pluginGroups(for items: [SkillHandle]) -> [PluginGroup] {
+        // Group by the actual plugin name (not marketplace) so one plugin's
+        // skills cluster together. Two plugins from the same marketplace get
+        // separate groups.
         let grouped = Dictionary(grouping: items) { handle -> String in
-            if case .plugin(let name) = handle.scope { return name }
+            if case .plugin(_, let plugin) = handle.scope { return plugin }
             return "unknown"
         }
         return grouped
@@ -199,6 +202,7 @@ private struct SectionHeader: View {
 
 private struct SkillRow: View {
     let handle: SkillHandle
+    @EnvironmentObject private var navigator: Navigator
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -216,6 +220,13 @@ private struct SkillRow: View {
             }
         }
         .padding(.vertical, 2)
+        .contextMenu {
+            if let pluginID = handle.pluginID {
+                Button("Show plugin") {
+                    navigator.openPlugin(id: pluginID)
+                }
+            }
+        }
     }
 
     @ViewBuilder

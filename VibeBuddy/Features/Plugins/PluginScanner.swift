@@ -94,37 +94,45 @@ struct PluginScanner: Sendable {
 
     private func scanContributions(in bundleRoot: URL) -> PluginContributions {
         PluginContributions(
-            skillCount: count(
+            skills: collect(
                 in: bundleRoot.appending(path: "skills", directoryHint: .isDirectory),
-                matching: { $0.lastPathComponent == "SKILL.md" }
+                matching: { $0.lastPathComponent == "SKILL.md" },
+                name: { $0.deletingLastPathComponent().lastPathComponent }
             ),
-            commandCount: count(
+            commands: collect(
                 in: bundleRoot.appending(path: "commands", directoryHint: .isDirectory),
-                matching: { $0.pathExtension == "md" }
+                matching: { $0.pathExtension == "md" },
+                name: { $0.deletingPathExtension().lastPathComponent }
             ),
-            agentCount: count(
+            agents: collect(
                 in: bundleRoot.appending(path: "agents", directoryHint: .isDirectory),
-                matching: { $0.pathExtension == "md" }
+                matching: { $0.pathExtension == "md" },
+                name: { $0.deletingPathExtension().lastPathComponent }
             )
         )
     }
 
-    private func count(
+    private func collect(
         in dir: URL,
-        matching predicate: (URL) -> Bool
-    ) -> Int {
+        matching predicate: (URL) -> Bool,
+        name: (URL) -> String
+    ) -> [PluginContributions.Resource] {
         let fm = FileManager.default
-        guard fm.fileExists(atPath: dir.path) else { return 0 }
+        guard fm.fileExists(atPath: dir.path) else { return [] }
         guard let enumerator = fm.enumerator(
             at: dir,
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles]
-        ) else { return 0 }
+        ) else { return [] }
 
-        var count = 0
+        var out: [PluginContributions.Resource] = []
         for case let url as URL in enumerator where predicate(url) {
-            count += 1
+            out.append(PluginContributions.Resource(
+                id: url.path,
+                name: name(url),
+                url: url
+            ))
         }
-        return count
+        return out.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 }

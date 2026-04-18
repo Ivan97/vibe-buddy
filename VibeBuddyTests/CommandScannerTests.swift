@@ -72,7 +72,7 @@ struct CommandScannerTests {
         let fs = try TempFS()
         // Real plugin command
         try fs.write(
-            path: fs.pluginsDir.appending(path: "cache/my-plugin/1.0/commands/build.md"),
+            path: fs.pluginsDir.appending(path: "cache/official/my-plugin/1.0.0/commands/build.md"),
             text: """
             ---
             description: Build it
@@ -81,12 +81,12 @@ struct CommandScannerTests {
         )
         // Docs-localized variant that should be skipped
         try fs.write(
-            path: fs.pluginsDir.appending(path: "cache/my-plugin/1.0/docs/ja-JP/commands/build.md"),
+            path: fs.pluginsDir.appending(path: "cache/official/my-plugin/1.0.0/docs/ja-JP/commands/build.md"),
             text: "スキップ"
         )
         // OpenCode variant that should be skipped
         try fs.write(
-            path: fs.pluginsDir.appending(path: "cache/my-plugin/1.0/.opencode/commands/build.md"),
+            path: fs.pluginsDir.appending(path: "cache/official/my-plugin/1.0.0/.opencode/commands/build.md"),
             text: "skip"
         )
 
@@ -96,8 +96,9 @@ struct CommandScannerTests {
         )
         #expect(handles.count == 1)
         let h = try #require(handles.first)
-        if case .plugin(let name) = h.scope {
-            #expect(name == "my-plugin")
+        if case .plugin(let marketplace, let plugin) = h.scope {
+            #expect(marketplace == "official")
+            #expect(plugin == "my-plugin")
         } else {
             Issue.record("expected .plugin")
         }

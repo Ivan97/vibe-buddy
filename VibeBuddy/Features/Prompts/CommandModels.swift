@@ -12,8 +12,16 @@ struct CommandHandle: Identifiable, Hashable, Sendable {
     let scope: Scope
 
     enum Scope: Hashable, Sendable {
-        case user                          // ~/.claude/commands/
-        case plugin(pluginName: String)    // ~/.claude/plugins/cache/<plugin>/.../commands/
+        case user                                               // ~/.claude/commands/
+        case plugin(marketplace: String, pluginName: String)    // ~/.claude/plugins/cache/<marketplace>/<plugin>/.../commands/
+    }
+
+    /// Matches `InstalledPlugin.id` when this command is plugin-provided.
+    var pluginID: String? {
+        if case .plugin(let marketplace, let name) = scope {
+            return "\(name)@\(marketplace)"
+        }
+        return nil
     }
 
     /// User-facing invocation like `frontend:lint` or `review`.

@@ -122,7 +122,7 @@ struct SkillClassifier: Sendable {
         var out: [SkillHandle] = []
         for case let url as URL in enumerator {
             guard url.lastPathComponent == "SKILL.md" else { continue }
-            let pluginName = Self.pluginName(for: url, root: dir)
+            let (marketplace, pluginName) = Self.pluginIdentity(for: url, root: dir)
             let (name, description) = readFrontmatter(at: url)
             let dirName = url.deletingLastPathComponent().lastPathComponent
             let displayName = name.isEmpty ? dirName : name
@@ -133,28 +133,33 @@ struct SkillClassifier: Sendable {
                     description: description,
                     displayURL: url.deletingLastPathComponent(),
                     skillMdURL: url,
-                    scope: .plugin(pluginName: pluginName)
+                    scope: .plugin(marketplace: marketplace, pluginName: pluginName)
                 )
             )
         }
         return out.sorted { $0.sortKey.localizedCaseInsensitiveCompare($1.sortKey) == .orderedAscending }
     }
 
-    /// Infers a plugin name from the first path segment inside
-    /// `~/.claude/plugins/`. Not perfect — git-clone caches use
-    /// `temp_git_<hash>` — but good enough for grouping and falls back to
-    /// the component itself when nothing better is available.
-    private static func pluginName(for skillURL: URL, root pluginsDir: URL) -> String {
+    /// Infers the marketplace + plugin name from the path relative to
+    /// `~/.claude/plugins/`. Expected layout:
+    /// `cache/<marketplace>/<plugin>/<version>/skills/<skill>/SKILL.md`.
+    /// Git-clone temp caches (`temp_git_*`) collapse marketplace and plugin
+    /// onto the same identifier.
+    private static func pluginIdentity(for skillURL: URL, root pluginsDir: URL) -> (marketplace: String, plugin: String) {
         let fullPath = skillURL.standardizedFileURL.pathComponents
         let rootPath = pluginsDir.standardizedFileURL.pathComponents
-        guard fullPath.count > rootPath.count + 1 else { return "unknown" }
-        // pluginsDir typically resolves to .../plugins. The next component is
-        // usually "cache", then the actual plugin directory name.
-        let afterRoot = Array(fullPath.dropFirst(rootPath.count))
-        if afterRoot.first == "cache", afterRoot.count > 1 {
-            return afterRoot[1]
+        guard fullPath.count > rootPath.count else {
+            return ("unknown", "unknown")
         }
-        return afterRoot.first ?? "unknown"
+        let afterRoot = Array(fullPath.dropFirst(rootPath.count))
+        // Expected: ["cache", "<marketplace>", "<plugin>", "<version>", "skills", ...]
+        if afterRoot.first == "cache" {
+            let marketplace = afterRoot.count > 1 ? afterRoot[1] : "unknown"
+            let plugin = afterRoot.count > 2 ? afterRoot[2] : marketplace
+            return (marketplace, plugin)
+        }
+        let first = afterRoot.first ?? "unknown"
+        return (first, first)
     }
 
     // MARK: - frontmatter peek

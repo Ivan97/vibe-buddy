@@ -100,7 +100,7 @@ struct CommandListView: View {
 
     private func pluginGroups(for items: [CommandHandle]) -> [PluginGroup] {
         let grouped = Dictionary(grouping: items) { handle -> String in
-            if case .plugin(let name) = handle.scope { return name }
+            if case .plugin(_, let plugin) = handle.scope { return plugin }
             return "unknown"
         }
         return grouped
@@ -160,6 +160,7 @@ private struct SectionHeader: View {
 
 private struct CommandRow: View {
     let handle: CommandHandle
+    @EnvironmentObject private var navigator: Navigator
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -181,5 +182,12 @@ private struct CommandRow: View {
             }
         }
         .padding(.vertical, 2)
+        .contextMenu {
+            if let pluginID = handle.pluginID {
+                Button("Show plugin") {
+                    navigator.openPlugin(id: pluginID)
+                }
+            }
+        }
     }
 }

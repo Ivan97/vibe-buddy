@@ -16,6 +16,7 @@ struct PromptsRoot: View {
 
 private struct PromptsShell: View {
     @ObservedObject var store: CommandStore
+    @EnvironmentObject private var navigator: Navigator
     @State private var selectedID: CommandHandle.ID?
     @State private var searchText: String = ""
     @State private var showNewSheet = false
@@ -49,6 +50,17 @@ private struct PromptsShell: View {
                 selectedID = handle.id
                 showNewSheet = false
             }
+        }
+        .onAppear(perform: consumePendingOpen)
+        .onChange(of: navigator.pendingCommandID) { _, _ in consumePendingOpen() }
+        .onChange(of: store.handles) { _, _ in consumePendingOpen() }
+    }
+
+    private func consumePendingOpen() {
+        guard let id = navigator.pendingCommandID else { return }
+        if store.handles.contains(where: { $0.id == id }) {
+            selectedID = id
+            navigator.pendingCommandID = nil
         }
     }
 

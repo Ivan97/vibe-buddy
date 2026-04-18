@@ -105,12 +105,12 @@ struct CommandEditorView: View {
 
     @ViewBuilder
     private var scopeBanner: some View {
-        if case .plugin(let pluginName) = handle.scope {
+        if case .plugin(let marketplace, let pluginName) = handle.scope {
             Banner(
                 icon: "lock.fill",
                 tone: .warning,
                 title: "Plugin-provided — read-only",
-                message: "Shipped by \(pluginName). Edits aren't saved from here."
+                message: "Shipped by \(pluginName) · \(marketplace). Edits aren't saved from here."
             )
         }
     }

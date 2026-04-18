@@ -98,7 +98,7 @@ struct SkillClassifierTests {
     func pluginSkills() throws {
         let env = try TempFS()
         try env.write(
-            path: env.pluginsDir.appending(path: "cache/my-plugin/skills/a/SKILL.md"),
+            path: env.pluginsDir.appending(path: "cache/official/my-plugin/1.0/skills/a/SKILL.md"),
             text: """
             ---
             name: a
@@ -107,7 +107,7 @@ struct SkillClassifierTests {
             """
         )
         try env.write(
-            path: env.pluginsDir.appending(path: "cache/my-plugin/skills/b/SKILL.md"),
+            path: env.pluginsDir.appending(path: "cache/official/my-plugin/1.0/skills/b/SKILL.md"),
             text: """
             ---
             name: b
@@ -119,7 +119,8 @@ struct SkillClassifierTests {
         let handles = SkillClassifier().scan(userSkillsDir: env.skillsDir, pluginsDir: env.pluginsDir)
         #expect(handles.count == 2)
         for h in handles {
-            if case .plugin(let plugin) = h.scope {
+            if case .plugin(let marketplace, let plugin) = h.scope {
+                #expect(marketplace == "official")
                 #expect(plugin == "my-plugin")
             } else {
                 Issue.record("expected .plugin")
