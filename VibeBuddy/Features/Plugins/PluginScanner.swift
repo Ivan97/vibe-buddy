@@ -53,11 +53,33 @@ struct PluginScanner: Sendable {
             )
         }
 
-        return out.sorted {
+        return dedupByLatestVersion(out).sorted {
             $0.marketplaceName.localizedCaseInsensitiveCompare($1.marketplaceName) == .orderedAscending
                 || ($0.marketplaceName == $1.marketplaceName
                     && $0.pluginName.localizedCaseInsensitiveCompare($1.pluginName) == .orderedAscending)
         }
+    }
+
+    /// Collapse duplicate `<marketplace>/<plugin>` bundles to the single
+    /// most recently modified version. Claude Code's cache keeps stale
+    /// versions around (e.g. `feature-dev/` has four commit-hash siblings);
+    /// surfacing all of them just clutters the list without adding value.
+    /// Using bundle-root mtime as the "latest" proxy works across semver
+    /// strings and git-hash versions alike.
+    private func dedupByLatestVersion(_ plugins: [InstalledPlugin]) -> [InstalledPlugin] {
+        let fm = FileManager.default
+        var picked: [String: InstalledPlugin] = [:]  // key = id, value = winner so far
+        var pickedMtime: [String: Date] = [:]
+
+        for plugin in plugins {
+            let mtime = (try? fm.attributesOfItem(atPath: plugin.bundleRoot.path)[.modificationDate]) as? Date ?? .distantPast
+            if let existing = pickedMtime[plugin.id], existing >= mtime {
+                continue  // keep the earlier (more recent) winner
+            }
+            picked[plugin.id] = plugin
+            pickedMtime[plugin.id] = mtime
+        }
+        return Array(picked.values)
     }
 
     // MARK: - helpers
