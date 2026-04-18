@@ -6,6 +6,12 @@ final class SkillStore: ObservableObject {
     @Published private(set) var isLoading: Bool = false
     @Published private(set) var loadError: String?
 
+    /// Upstream status for `userSymlink`-scope skills only. User-authored
+    /// skills have no upstream; plugin-scope skills piggy-back on
+    /// `PluginsStore.status(for:)` — the list view composes both sources.
+    @Published private(set) var updateStatus: [SkillHandle.ID: GitUpdateChecker.Status] = [:]
+    @Published private(set) var isCheckingUpdates: Bool = false
+
     let claudeHome: ClaudeHome
     private let classifier: SkillClassifier
     private var userWatcher: DirectoryWatcher?
@@ -202,6 +208,77 @@ final class SkillStore: ObservableObject {
             try? await Task.sleep(for: .milliseconds(500))
             guard !Task.isCancelled else { return }
             await self?.reload()
+        }
+    }
+
+    // MARK: - update checks
+
+    /// Status for a symlinked skill. Plugin-scope skills aren't stored
+    /// here — callers read those from `PluginsStore` keyed by pluginID.
+    func status(for handleID: SkillHandle.ID) -> GitUpdateChecker.Status {
+        updateStatus[handleID] ?? .unchecked
+    }
+
+    /// Resolves a `userSymlink` handle's target to its enclosing git repo
+    /// and runs an update check. No-op for other scopes.
+    func checkForUpdate(_ handleID: SkillHandle.ID) async {
+        guard let handle = handles.first(where: { $0.id == handleID }),
+              case .userSymlink(let target) = handle.scope else { return }
+        guard let root = GitUpdateChecker.findRepoRoot(startingFrom: target) else {
+            updateStatus[handleID] = .notTracked
+            return
+        }
+        updateStatus[handleID] = .checking
+        updateStatus[handleID] = await GitUpdateChecker.check(repoRoot: root)
+    }
+
+    /// Bulk-check every `userSymlink` skill. Like the plugin variant,
+    /// capped at 4 concurrent git calls.
+    func checkAllForUpdates() async {
+        guard !isCheckingUpdates else { return }
+        isCheckingUpdates = true
+        defer { isCheckingUpdates = false }
+
+        let targets: [(id: SkillHandle.ID, root: URL)] = handles.compactMap { handle in
+            guard case .userSymlink(let target) = handle.scope else { return nil }
+            guard let root = GitUpdateChecker.findRepoRoot(startingFrom: target) else {
+                return nil
+            }
+            return (handle.id, root)
+        }
+        // Seed statuses so the UI flips to 'checking' / 'notTracked'
+        // immediately — the async results backfill progressively.
+        for handle in handles {
+            guard case .userSymlink(let target) = handle.scope else { continue }
+            if GitUpdateChecker.findRepoRoot(startingFrom: target) == nil {
+                updateStatus[handle.id] = .notTracked
+            } else {
+                updateStatus[handle.id] = .checking
+            }
+        }
+
+        await withTaskGroup(of: (SkillHandle.ID, GitUpdateChecker.Status).self) { group in
+            var inFlight = 0
+            var iterator = targets.makeIterator()
+            let limit = 4
+
+            func enqueueNext() {
+                guard let next = iterator.next() else { return }
+                group.addTask {
+                    (next.id, await GitUpdateChecker.check(repoRoot: next.root))
+                }
+                inFlight += 1
+            }
+
+            for _ in 0..<min(limit, targets.count) { enqueueNext() }
+
+            while inFlight > 0 {
+                if let result = await group.next() {
+                    updateStatus[result.0] = result.1
+                    inFlight -= 1
+                    enqueueNext()
+                }
+            }
         }
     }
 }

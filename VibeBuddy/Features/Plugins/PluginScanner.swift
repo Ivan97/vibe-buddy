@@ -68,26 +68,52 @@ struct PluginScanner: Sendable {
         }
     }
 
-    /// Collapse duplicate `<marketplace>/<plugin>` bundles to the single
-    /// most recently modified version. Claude Code's cache keeps stale
-    /// versions around (e.g. `feature-dev/` has four commit-hash siblings);
-    /// surfacing all of them just clutters the list without adding value.
-    /// Using bundle-root mtime as the "latest" proxy works across semver
-    /// strings and git-hash versions alike.
+    /// Collapse duplicate `<marketplace>/<plugin>` bundles. Claude Code's
+    /// cache keeps stale versions around (e.g. `feature-dev/` has four
+    /// commit-hash siblings); surfacing all of them just clutters the list.
+    ///
+    /// Picking strategy, in order:
+    ///   1. Prefer the bundle whose `manifest.version` compares highest
+    ///      under numeric-aware string compare ("12.1.10" > "12.1.9").
+    ///      This fixes `claude plugin update` racing with mtime — the new
+    ///      bundle dir sometimes carries a git-commit mtime that's older
+    ///      than the existing cache entry.
+    ///   2. If neither side has a parseable version, fall back to
+    ///      bundle-root mtime (works for commit-hash-named bundles where
+    ///      no semver exists).
+    private struct Candidate {
+        let plugin: InstalledPlugin
+        let mtime: Date
+        var version: String? { plugin.manifest.version }
+    }
+
     private func dedupByLatestVersion(_ plugins: [InstalledPlugin]) -> [InstalledPlugin] {
         let fm = FileManager.default
-        var picked: [String: InstalledPlugin] = [:]  // key = id, value = winner so far
-        var pickedMtime: [String: Date] = [:]
+        var picked: [String: Candidate] = [:]
 
         for plugin in plugins {
             let mtime = (try? fm.attributesOfItem(atPath: plugin.bundleRoot.path)[.modificationDate]) as? Date ?? .distantPast
-            if let existing = pickedMtime[plugin.id], existing >= mtime {
-                continue  // keep the earlier (more recent) winner
+            let next = Candidate(plugin: plugin, mtime: mtime)
+            if let current = picked[plugin.id], !Self.shouldReplace(current: current, with: next) {
+                continue
             }
-            picked[plugin.id] = plugin
-            pickedMtime[plugin.id] = mtime
+            picked[plugin.id] = next
         }
-        return Array(picked.values)
+        return picked.values.map(\.plugin)
+    }
+
+    /// `true` when `new` is a better choice than `current` — newer version
+    /// first, then newer mtime as a tiebreak.
+    private static func shouldReplace(current: Candidate, with new: Candidate) -> Bool {
+        if let cv = current.version, !cv.isEmpty,
+           let nv = new.version, !nv.isEmpty {
+            switch cv.compare(nv, options: .numeric) {
+            case .orderedAscending:  return true     // new is higher → replace
+            case .orderedDescending: return false    // current stays
+            case .orderedSame:       break           // fall through to mtime
+            }
+        }
+        return new.mtime > current.mtime
     }
 
     // MARK: - helpers

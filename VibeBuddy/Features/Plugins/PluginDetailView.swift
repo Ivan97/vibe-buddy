@@ -2,13 +2,23 @@ import SwiftUI
 
 struct PluginDetailView: View {
     let plugin: InstalledPlugin
+    let status: GitUpdateChecker.Status
+    let isUpdating: Bool
+    let lastUpdateResult: PluginsStore.UpdateResult?
     let onToggle: (Bool) -> Void
+    let onCheckUpdate: () -> Void
+    let onUpdateNow: () -> Void
+    let onDismissUpdateResult: () -> Void
     @EnvironmentObject private var navigator: Navigator
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
+                updateBanner
+                if let result = lastUpdateResult {
+                    updateResultBanner(result)
+                }
                 Divider()
                 contributionsSection
                 if !plugin.manifest.keywords.isEmpty {
@@ -48,6 +58,23 @@ struct PluginDetailView: View {
                     }
                 }
                 Spacer()
+                // Always-visible Update now CTA — mirrors Claude Code's
+                // /plugin TUI where "Update now" is a top-level action on
+                // every plugin, not gated behind a prior check.
+                Button(action: onUpdateNow) {
+                    if isUpdating {
+                        HStack(spacing: 4) {
+                            ProgressView().controlSize(.small)
+                            Text("Updating…")
+                        }
+                    } else {
+                        Label("Update now", systemImage: "arrow.down.circle")
+                    }
+                }
+                .controlSize(.large)
+                .disabled(isUpdating)
+                .help("Run `claude plugin update \(plugin.id)` — Claude Code pulls the latest version. Restart running sessions to pick it up.")
+
                 Toggle("Enabled", isOn: Binding(
                     get: { plugin.isEnabled },
                     set: { onToggle($0) }
@@ -92,6 +119,192 @@ struct PluginDetailView: View {
             }
             .font(.caption)
         }
+    }
+
+    /// Upstream-status row. Always present when a plugin is tracked — it
+    /// either says "Up to date", "Update available · <shas>", or offers a
+    /// Check button. Upgrading itself is NOT our responsibility; that
+    /// stays with Claude Code's `/plugin update` command.
+    @ViewBuilder
+    private var updateBanner: some View {
+        switch status {
+        case .unchecked:
+            // No banner in this state — the always-visible "Update now"
+            // button in the header is the entry point; a separate
+            // "Upstream not checked yet · Check" row is just noise.
+            EmptyView()
+        case .checking:
+            bannerRow(
+                icon: "arrow.triangle.2.circlepath",
+                tint: .secondary,
+                title: "Checking upstream…",
+                subtitle: nil,
+                action: nil,
+                actionLabel: nil,
+                pulse: true
+            )
+        case .upToDate(let local, let at):
+            bannerRow(
+                icon: "checkmark.seal.fill",
+                tint: .green,
+                title: "Up to date",
+                subtitle: "\(local.prefix(7)) · checked \(Self.relative(at))",
+                action: onCheckUpdate,
+                actionLabel: "Re-check",
+                pulse: false
+            )
+        case .updateAvailable(let local, let remote, let at):
+            updateAvailableBanner(local: local, remote: remote, at: at)
+        case .notTracked:
+            bannerRow(
+                icon: "link.badge.plus",
+                tint: .secondary,
+                title: "Not tracked by git",
+                subtitle: "Bundle at \(plugin.bundleRoot.lastPathComponent) isn't a git checkout — nothing to compare against.",
+                action: nil,
+                actionLabel: nil,
+                pulse: false
+            )
+        case .error(let reason):
+            bannerRow(
+                icon: "exclamationmark.triangle.fill",
+                tint: .red,
+                title: "Update check failed",
+                subtitle: reason,
+                action: onCheckUpdate,
+                actionLabel: "Retry",
+                pulse: false
+            )
+        }
+    }
+
+    /// Dedicated variant so the "Update now" CTA can sit next to a
+    /// "Re-check" button without cramming two actions into the generic
+    /// banner helper. Spinner while the CLI call is in flight.
+    private func updateAvailableBanner(local: String, remote: String, at: Date) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "arrow.up.circle.fill")
+                .foregroundStyle(.orange)
+                .font(.body)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Update available").font(.caption.bold())
+                Text("\(local.prefix(7)) → \(remote.prefix(7)) · checked \(Self.relative(at)). Updating requires a Claude Code restart to apply.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button(action: onCheckUpdate) {
+                Text("Re-check")
+            }
+            .controlSize(.small)
+            .disabled(isUpdating)
+            Button(action: onUpdateNow) {
+                if isUpdating {
+                    HStack(spacing: 4) {
+                        ProgressView().controlSize(.small)
+                        Text("Updating…")
+                    }
+                } else {
+                    Text("Update now")
+                }
+            }
+            .controlSize(.small)
+            .buttonStyle(.borderedProminent)
+            .disabled(isUpdating)
+        }
+        .padding(10)
+        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+        )
+    }
+
+    /// Post-run outcome banner — kept dismissible so the detail view
+    /// doesn't grow a scroll-only set of stale messages.
+    private func updateResultBanner(_ result: PluginsStore.UpdateResult) -> some View {
+        let (icon, tint, title, subtitle): (String, Color, String, String) = {
+            switch result {
+            case .success(let output, let at):
+                let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+                let preview = trimmed.isEmpty ? "Completed. Restart Claude Code sessions to apply." : trimmed
+                return ("checkmark.circle.fill", .green, "Updated \(Self.relative(at))", preview)
+            case .failure(let msg, let at):
+                return ("xmark.octagon.fill", .red, "Update failed \(Self.relative(at))", msg)
+            }
+        }()
+        return HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .foregroundStyle(tint)
+                .font(.body)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.caption.bold())
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .lineLimit(6)
+            }
+            Spacer()
+            Button("Dismiss", action: onDismissUpdateResult)
+                .controlSize(.small)
+        }
+        .padding(10)
+        .background(tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(tint.opacity(0.25), lineWidth: 1))
+    }
+
+    private func bannerRow(
+        icon: String,
+        tint: Color,
+        title: String,
+        subtitle: String?,
+        action: (() -> Void)?,
+        actionLabel: String?,
+        pulse: Bool
+    ) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Group {
+                if pulse {
+                    Image(systemName: icon)
+                        .symbolEffect(.pulse, options: .repeating)
+                } else {
+                    Image(systemName: icon)
+                }
+            }
+            .foregroundStyle(tint)
+            .font(.body)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.caption.bold())
+                if let subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            if let action, let actionLabel {
+                Button(actionLabel, action: action)
+                    .controlSize(.small)
+            }
+        }
+        .padding(10)
+        .background(tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(tint.opacity(0.25), lineWidth: 1)
+        )
+    }
+
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .short
+        return f
+    }()
+
+    private static func relative(_ date: Date) -> String {
+        relativeFormatter.localizedString(for: date, relativeTo: Date())
     }
 
     private var contributionsSection: some View {

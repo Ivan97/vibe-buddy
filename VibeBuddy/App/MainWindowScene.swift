@@ -9,6 +9,7 @@ struct MainWindowScene: Scene {
     @ObservedObject var commandStore: CommandStore
     @ObservedObject var hooksStore: HooksStore
     @ObservedObject var pluginsStore: PluginsStore
+    @ObservedObject var marketplacesStore: MarketplacesStore
     @ObservedObject var statuslineStore: StatuslineStore
     @ObservedObject var mcpStore: MCPStore
     @ObservedObject var settingsStore: SettingsStore
@@ -25,6 +26,7 @@ struct MainWindowScene: Scene {
                 .environmentObject(commandStore)
                 .environmentObject(hooksStore)
                 .environmentObject(pluginsStore)
+                .environmentObject(marketplacesStore)
                 .environmentObject(statuslineStore)
                 .environmentObject(mcpStore)
                 .environmentObject(settingsStore)

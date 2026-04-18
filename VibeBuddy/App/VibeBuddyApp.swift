@@ -11,6 +11,7 @@ struct VibeBuddyApp: App {
     @StateObject private var commandStore = CommandStore()
     @StateObject private var hooksStore = HooksStore()
     @StateObject private var pluginsStore = PluginsStore()
+    @StateObject private var marketplacesStore = MarketplacesStore()
     @StateObject private var statuslineStore = StatuslineStore()
     @StateObject private var mcpStore = MCPStore()
     @StateObject private var settingsStore = SettingsStore()
@@ -26,6 +27,7 @@ struct VibeBuddyApp: App {
             commandStore: commandStore,
             hooksStore: hooksStore,
             pluginsStore: pluginsStore,
+            marketplacesStore: marketplacesStore,
             statuslineStore: statuslineStore,
             mcpStore: mcpStore,
             settingsStore: settingsStore,

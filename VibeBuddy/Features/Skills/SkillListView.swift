@@ -6,9 +6,12 @@ struct SkillListView: View {
     @Binding var searchText: String
     let totalCount: Int
     let isLoading: Bool
+    let isCheckingUpdates: Bool
+    let updateStatus: (SkillHandle) -> GitUpdateChecker.Status
     let error: String?
     let onNewSkill: () -> Void
     let onRefresh: () -> Void
+    let onCheckUpdates: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -57,7 +60,7 @@ struct SkillListView: View {
         if !items.isEmpty {
             Section {
                 ForEach(items) { handle in
-                    SkillRow(handle: handle)
+                    SkillRow(handle: handle, status: updateStatus(handle))
                         .tag(handle.id as SkillHandle.ID?)
                 }
             } header: {
@@ -76,7 +79,7 @@ struct SkillListView: View {
         if !items.isEmpty {
             Section {
                 ForEach(items) { handle in
-                    SkillRow(handle: handle)
+                    SkillRow(handle: handle, status: updateStatus(handle))
                         .tag(handle.id as SkillHandle.ID?)
                 }
             } header: {
@@ -97,7 +100,7 @@ struct SkillListView: View {
                 ForEach(pluginGroups(for: items), id: \.pluginName) { group in
                     DisclosureGroup {
                         ForEach(group.skills) { handle in
-                            SkillRow(handle: handle)
+                            SkillRow(handle: handle, status: updateStatus(handle))
                                 .tag(handle.id as SkillHandle.ID?)
                         }
                     } label: {
@@ -155,6 +158,13 @@ struct SkillListView: View {
                 .foregroundStyle(.secondary)
             TextField("Search skills", text: $searchText)
                 .textFieldStyle(.plain)
+            Button(action: onCheckUpdates) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .symbolEffect(.pulse, options: .repeating, isActive: isCheckingUpdates)
+            }
+            .buttonStyle(.borderless)
+            .disabled(isCheckingUpdates || handles.isEmpty)
+            .help("Check symlinked + plugin-provided skills for updates")
             Button(action: onRefresh) {
                 Image(systemName: "arrow.clockwise")
                     .symbolEffect(.pulse, options: .repeating, isActive: isLoading)
@@ -202,6 +212,7 @@ private struct SectionHeader: View {
 
 private struct SkillRow: View {
     let handle: SkillHandle
+    let status: GitUpdateChecker.Status
     @EnvironmentObject private var navigator: Navigator
 
     var body: some View {
@@ -211,15 +222,18 @@ private struct SkillRow: View {
                     .font(.body)
                     .lineLimit(1)
                 scopeBadge
+                UpdateStatusBadge(status: status)
             }
             if !handle.description.isEmpty {
                 Text(handle.description)
                     .font(.caption)
                     .foregroundStyle(handle.isEditable ? .secondary : .tertiary)
                     .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contextMenu {
             if let pluginID = handle.pluginID {
                 Button("Show plugin") {

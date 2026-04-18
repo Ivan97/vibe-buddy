@@ -2,20 +2,24 @@ import SwiftUI
 
 struct PluginsRoot: View {
     @EnvironmentObject private var store: PluginsStore
+    @EnvironmentObject private var marketplaces: MarketplacesStore
 
     var body: some View {
-        PluginsShell(store: store)
+        PluginsShell(store: store, marketplaces: marketplaces)
             .task {
                 if store.plugins.isEmpty {
                     await store.reload()
                 }
                 store.startWatching()
+                await marketplaces.reload()
+                marketplaces.startWatching()
             }
     }
 }
 
 private struct PluginsShell: View {
     @ObservedObject var store: PluginsStore
+    @ObservedObject var marketplaces: MarketplacesStore
     @EnvironmentObject private var navigator: Navigator
     @State private var selectedID: InstalledPlugin.ID?
     @State private var searchText: String = ""
@@ -31,17 +35,32 @@ private struct PluginsShell: View {
                 totalCount: store.plugins.count,
                 enabledCount: store.plugins.filter(\.isEnabled).count,
                 isLoading: store.isLoading,
-                onRefresh: { Task { await store.reload() } }
+                isCheckingUpdates: store.isCheckingUpdates,
+                updateStatus: { store.status(for: $0) },
+                autoUpdate: { marketplaces.entry(named: $0)?.autoUpdate ?? false },
+                onRefresh: { Task { await store.reload() } },
+                onCheckUpdates: { Task { await store.checkAllForUpdates() } },
+                onToggleMarketplaceAutoUpdate: { name, enabled in
+                    prepareMarketplaceToggle(name: name, enabled: enabled)
+                }
             )
-            .frame(minWidth: 300, idealWidth: 360, maxWidth: 440)
+            .frame(minWidth: 300, idealWidth: 400)
 
             Group {
                 if let plugin = selectedPlugin {
+                    // No .id — PluginDetailView is stateless beyond hover,
+                    // so it re-renders fine on parameter change. Forcing
+                    // fresh identity would reset HSplitView's divider.
                     PluginDetailView(
                         plugin: plugin,
-                        onToggle: { newValue in prepareToggle(plugin, isEnabled: newValue) }
+                        status: store.status(for: plugin.id),
+                        isUpdating: store.updatesInFlight.contains(plugin.id),
+                        lastUpdateResult: store.lastUpdateResult[plugin.id],
+                        onToggle: { newValue in prepareToggle(plugin, isEnabled: newValue) },
+                        onCheckUpdate: { Task { await store.checkForUpdate(plugin.id) } },
+                        onUpdateNow: { Task { await store.runUpdate(plugin.id) } },
+                        onDismissUpdateResult: { store.clearUpdateResult(plugin.id) }
                     )
-                    .id(plugin.id)
                 } else {
                     ContentUnavailableView(
                         "Select a plugin",
@@ -49,7 +68,7 @@ private struct PluginsShell: View {
                     )
                 }
             }
-            .frame(minWidth: 460, maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 400, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: Binding(
@@ -59,7 +78,7 @@ private struct PluginsShell: View {
             if let pair = diffPair {
                 DiffPreviewSheet(
                     title: pair.title,
-                    message: store.claudeHome.settingsFile.path(percentEncoded: false),
+                    message: pair.file.path(percentEncoded: false),
                     beforeText: pair.before,
                     afterText: pair.after,
                     onConfirm: { commit(pair) }
@@ -98,12 +117,16 @@ private struct PluginsShell: View {
 
     // MARK: - toggle
 
+    /// Unified pending-diff envelope — one sheet handles both plugin
+    /// enable/disable and marketplace autoUpdate flips. The `apply`
+    /// closure carries the commit-time side effect so we don't need
+    /// parallel commit paths per target file.
     private struct DiffPair {
         let title: String
+        let file: URL
         let before: String
         let after: String
-        let plugin: InstalledPlugin
-        let newValue: Bool
+        let apply: () throws -> Void
     }
 
     private func prepareToggle(_ plugin: InstalledPlugin, isEnabled: Bool) {
@@ -111,10 +134,25 @@ private struct PluginsShell: View {
             let pair = try store.previewToggle(plugin: plugin, isEnabled: isEnabled)
             diffPair = DiffPair(
                 title: "\(isEnabled ? "Enable" : "Disable") \(plugin.pluginName)?",
+                file: store.claudeHome.settingsFile,
                 before: pair.before,
                 after: pair.after,
-                plugin: plugin,
-                newValue: isEnabled
+                apply: { try store.commitToggle(plugin: plugin, isEnabled: isEnabled) }
+            )
+        } catch {
+            saveError = (error as NSError).localizedDescription
+        }
+    }
+
+    private func prepareMarketplaceToggle(name: String, enabled: Bool) {
+        do {
+            let pair = try marketplaces.previewAutoUpdate(name, enabled: enabled)
+            diffPair = DiffPair(
+                title: "\(enabled ? "Enable" : "Disable") auto-update for \(name)?",
+                file: marketplaces.url,
+                before: pair.before,
+                after: pair.after,
+                apply: { try marketplaces.commitAutoUpdate(name, enabled: enabled) }
             )
         } catch {
             saveError = (error as NSError).localizedDescription
@@ -123,7 +161,7 @@ private struct PluginsShell: View {
 
     private func commit(_ pair: DiffPair) {
         do {
-            try store.commitToggle(plugin: pair.plugin, isEnabled: pair.newValue)
+            try pair.apply()
             saveError = nil
         } catch {
             saveError = (error as NSError).localizedDescription

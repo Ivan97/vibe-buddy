@@ -7,7 +7,12 @@ struct PluginsListView: View {
     let totalCount: Int
     let enabledCount: Int
     let isLoading: Bool
+    let isCheckingUpdates: Bool
+    let updateStatus: (String) -> GitUpdateChecker.Status
+    let autoUpdate: (String) -> Bool
     let onRefresh: () -> Void
+    let onCheckUpdates: () -> Void
+    let onToggleMarketplaceAutoUpdate: (_ marketplace: String, _ enabled: Bool) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -18,7 +23,7 @@ struct PluginsListView: View {
                 ForEach(grouped, id: \.marketplace) { group in
                     Section(header: header(for: group)) {
                         ForEach(group.plugins) { plugin in
-                            PluginRow(plugin: plugin)
+                            PluginRow(plugin: plugin, status: updateStatus(plugin.id))
                                 .tag(plugin.id as InstalledPlugin.ID?)
                         }
                     }
@@ -61,15 +66,12 @@ struct PluginsListView: View {
     }
 
     private func header(for group: MarketplaceGroup) -> some View {
-        HStack {
-            Image(systemName: "shippingbox")
-            Text(group.marketplace)
-                .font(.caption.bold())
-            Spacer()
-            Text("\(group.plugins.count)")
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-        }
+        MarketplaceHeader(
+            name: group.marketplace,
+            count: group.plugins.count,
+            autoUpdate: autoUpdate(group.marketplace),
+            onToggleAutoUpdate: { onToggleMarketplaceAutoUpdate(group.marketplace, $0) }
+        )
     }
 
     private var searchBar: some View {
@@ -78,6 +80,13 @@ struct PluginsListView: View {
                 .foregroundStyle(.secondary)
             TextField("Search plugins", text: $searchText)
                 .textFieldStyle(.plain)
+            Button(action: onCheckUpdates) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .symbolEffect(.pulse, options: .repeating, isActive: isCheckingUpdates)
+            }
+            .buttonStyle(.borderless)
+            .disabled(isCheckingUpdates || plugins.isEmpty)
+            .help("Check installed plugins for upstream updates")
             Button(action: onRefresh) {
                 Image(systemName: "arrow.clockwise")
                     .symbolEffect(.pulse, options: .repeating, isActive: isLoading)
@@ -104,6 +113,7 @@ struct PluginsListView: View {
 
 private struct PluginRow: View {
     let plugin: InstalledPlugin
+    let status: GitUpdateChecker.Status
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -125,6 +135,7 @@ private struct PluginRow: View {
                         .font(.caption2.monospaced())
                         .foregroundStyle(.tertiary)
                 }
+                UpdateStatusBadge(status: status)
             }
 
             if let description = plugin.manifest.description, !description.isEmpty {
@@ -132,11 +143,16 @@ private struct PluginRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
+                    // Without this, List squeezes the 2nd line and pushes
+                    // the contribution chips out of the row's visible
+                    // area — see the plugin-list-clip regression.
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             ContributionSummary(contributions: plugin.contributions)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -169,5 +185,74 @@ private struct ContributionSummary: View {
             Text(text).font(.caption2.monospacedDigit())
         }
         .foregroundStyle(.secondary)
+    }
+}
+
+/// Marketplace section header with an inline auto-update toggle. The
+/// Toggle itself is intercepted via a custom Binding so a click triggers
+/// the DiffPreviewSheet flow rather than writing straight through — every
+/// config mutation in the app confirms before hitting disk.
+private struct MarketplaceHeader: View {
+    let name: String
+    let count: Int
+    let autoUpdate: Bool
+    let onToggleAutoUpdate: (Bool) -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "shippingbox")
+            Text(name)
+                .font(.caption.bold())
+            Spacer()
+            Toggle(isOn: Binding(
+                get: { autoUpdate },
+                set: { newValue in onToggleAutoUpdate(newValue) }
+            )) {
+                Text("auto-update")
+                    .font(.caption2)
+            }
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .help("When on, Claude Code pulls the latest version of every plugin from this marketplace on launch.")
+            Text("\(count)")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// Compact update-status pill rendered next to the plugin name (and, in
+/// the Skills module, next to skill names). Uses SF Symbol animation for
+/// the checking state so the list feels responsive during a bulk scan.
+struct UpdateStatusBadge: View {
+    let status: GitUpdateChecker.Status
+
+    var body: some View {
+        switch status {
+        case .unchecked, .notTracked:
+            EmptyView()
+        case .checking:
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .symbolEffect(.pulse, options: .repeating)
+        case .upToDate:
+            Image(systemName: "checkmark.seal.fill")
+                .font(.caption2)
+                .foregroundStyle(.green)
+                .help("Up to date")
+        case .updateAvailable:
+            HStack(spacing: 2) {
+                Image(systemName: "arrow.up.circle.fill")
+                Text("update")
+            }
+            .font(.caption2.bold())
+            .foregroundStyle(.orange)
+        case .error(let reason):
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption2)
+                .foregroundStyle(.red)
+                .help(reason)
+        }
     }
 }
