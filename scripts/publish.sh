@@ -17,20 +17,26 @@ fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-ENCLOSURE_FILE=".build/release/enclosure.txt"
-if [[ ! -f "$ENCLOSURE_FILE" ]]; then
-    echo "✗ $ENCLOSURE_FILE not found. Run ./scripts/release.sh $VERSION first." >&2
+SPARKLE_VERSION="${SPARKLE_VERSION:-2.9.1}"
+SPARKLE_BIN=".build/sparkle-$SPARKLE_VERSION/bin"
+ZIP_NAME="VibeBuddy-$VERSION.zip"
+ZIP_PATH=".build/release/$ZIP_NAME"
+
+if [[ ! -f "$ZIP_PATH" ]]; then
+    echo "✗ $ZIP_PATH not found. Run ./scripts/release.sh $VERSION first." >&2
     exit 1
 fi
-# shellcheck disable=SC1090
-source "$ENCLOSURE_FILE"
-
-if [[ "$VERSION" != "${VERSION_FROM_FILE:-$VERSION}" ]]; then : ; fi
 
 if ! command -v gh >/dev/null; then
     echo "✗ gh CLI not found. Install with: brew install gh && gh auth login" >&2
     exit 1
 fi
+
+# Recompute signature + length from the zip — cheaper than round-tripping
+# the signature string through a shell-sourced file (its embedded quotes
+# would get eaten).
+SIG_LINE=$("$SPARKLE_BIN/sign_update" "$ZIP_PATH")
+BUILD_NUMBER="$(git rev-list --count HEAD)"
 
 REPO="${GITHUB_REPO:-Ivan97/vibe-buddy}"
 TAG="v$VERSION"

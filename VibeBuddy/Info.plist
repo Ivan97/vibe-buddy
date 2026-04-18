@@ -35,9 +35,9 @@
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://example.com/vibebuddy/appcast.xml</string>
+	<string>https://blog.iooo.tech/vibe-buddy/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string></string>
+	<string>X3ktgdREKn4UrqN4/iWpRNe2+61PYVBJn+I9ATGMZWU=</string>
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
 	<key>SentryDSN</key>
