@@ -4,10 +4,14 @@ import Foundation
 /// the typed `[MCPServer]` list.
 enum MCPCodec {
 
-    static func parse(_ any: Any?) -> [MCPServer] {
+    /// Parse the `mcpServers` field of a user's `~/.claude.json` (or any
+    /// JSON blob with the same shape). Assigns the given `scope` to every
+    /// server — callers use `.user` for `~/.claude.json` and
+    /// `.plugin(..)` when reading a plugin's `plugin.json`.
+    static func parse(_ any: Any?, scope: MCPServer.Scope = .user) -> [MCPServer] {
         guard let dict = any as? [String: Any] else { return [] }
         return dict
-            .map { (name, raw) in parseServer(name: name, raw: raw) }
+            .map { (name, raw) in parseServer(name: name, raw: raw, scope: scope) }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
@@ -15,7 +19,7 @@ enum MCPCodec {
         "type", "command", "args", "env", "url", "headers"
     ]
 
-    private static func parseServer(name: String, raw: Any) -> MCPServer {
+    private static func parseServer(name: String, raw: Any, scope: MCPServer.Scope) -> MCPServer {
         let dict = (raw as? [String: Any]) ?? [:]
         let typeString = (dict["type"] as? String) ?? "stdio"
         let transport = MCPServer.Transport(rawValue: typeString) ?? .stdio
@@ -39,7 +43,8 @@ enum MCPCodec {
             env: env,
             url: url,
             headers: headers,
-            extras: extras
+            extras: extras,
+            scope: scope
         )
     }
 

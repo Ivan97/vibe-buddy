@@ -151,9 +151,10 @@ private struct MCPShell: View {
 
     private func deleteSelected() {
         guard let name = selectedName,
-              let idx = editing.firstIndex(where: { $0.name == name }) else { return }
+              let idx = editing.firstIndex(where: { $0.name == name }),
+              editing[idx].isEditable else { return }
         editing.remove(at: idx)
-        selectedName = editing.first?.name
+        selectedName = editing.first(where: { $0.isEditable })?.name ?? editing.first?.name
     }
 
     private struct DiffPair {

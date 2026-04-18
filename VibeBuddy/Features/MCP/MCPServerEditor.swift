@@ -8,6 +8,10 @@ struct MCPServerEditor: View {
             VStack(alignment: .leading, spacing: 18) {
                 header
 
+                if case .plugin = server.scope {
+                    pluginBanner
+                }
+
                 Divider()
 
                 transportPicker
@@ -27,6 +31,7 @@ struct MCPServerEditor: View {
                 }
             }
             .padding(20)
+            .disabled(!server.isEditable)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -40,6 +45,29 @@ struct MCPServerEditor: View {
             Text("Renaming a server requires deleting and re-creating it so Claude Code sees the new key under mcpServers.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var pluginBanner: some View {
+        if case .plugin(let marketplace, let pluginName) = server.scope {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "lock.fill").foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Plugin-provided — read-only").font(.caption.bold())
+                    Text("Shipped by \(pluginName) · \(marketplace). Edits aren't saved from here.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+            )
         }
     }
 
