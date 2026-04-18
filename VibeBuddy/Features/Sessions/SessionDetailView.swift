@@ -5,22 +5,14 @@ struct SessionDetailView: View {
     let summary: SessionSummary
     @StateObject private var loader = SessionMessageLoader()
 
-    /// True when the user's viewport includes the tail anchor — i.e. they're
-    /// currently looking at the latest messages. Drives follow-latest and
-    /// the in-progress spinner below.
+    /// True when the user's viewport includes the tail anchor — i.e.
+    /// they're currently looking at the latest messages.
     @State private var isPinnedToBottom: Bool = true
     @State private var lastKnownCount: Int = 0
-    @State private var now: Date = Date()
-
-    /// Ticks every 15s so the live-spinner can decay if FS events stop
-    /// (a session that goes idle for >5 min no longer shows "in progress").
-    private let liveTicker = Timer.publish(every: 15, on: .main, in: .common).autoconnect()
+    /// Brief visual flash on pin engage/release. Visible for ~300 ms.
+    @State private var snapPulse: Bool = false
 
     private static let bottomAnchorID = "bottom-anchor"
-
-    private var isSessionLive: Bool {
-        summary.isLive(now: now)
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -49,7 +41,6 @@ struct SessionDetailView: View {
             }
         }
         .onAppear { loader.load(summary) }
-        .onReceive(liveTicker) { now = $0 }
     }
 
     @ViewBuilder
@@ -66,7 +57,7 @@ struct SessionDetailView: View {
                         MessageRow(entry: entry).id(entry.id)
                     }
 
-                    if isSessionLive {
+                    if loader.isInProgress {
                         InProgressIndicator()
                             .id("in-progress-indicator")
                     }
@@ -84,6 +75,15 @@ struct SessionDetailView: View {
             }
             .defaultScrollAnchor(.bottom)      // initial position + resize anchor
             .textSelection(.enabled)
+            .overlay(alignment: .bottom) {
+                // Visual snap cue — a short accent-colored line pulses at
+                // the viewport's bottom edge when pin engages or releases.
+                // Kept for users whose trackpad doesn't do Force Touch.
+                Rectangle()
+                    .fill(Color.accentColor.opacity(snapPulse ? 0.55 : 0))
+                    .frame(height: 2)
+                    .allowsHitTesting(false)
+            }
             .onChange(of: loader.anchorRequest) { _, newValue in
                 guard let id = newValue else { return }
                 var transaction = Transaction()
@@ -97,14 +97,7 @@ struct SessionDetailView: View {
                 handleCountChange(newCount: newCount, proxy: proxy)
             }
             .onChange(of: isPinnedToBottom) { _, _ in
-                // Magnetic feel — the trackpad emits a subtle click on each
-                // pin engage / release. `.alignment` is Apple's designated
-                // snap/alignment pattern; works on Force Touch and Magic
-                // Trackpad, no-ops elsewhere.
-                NSHapticFeedbackManager.defaultPerformer.perform(
-                    .alignment,
-                    performanceTime: .now
-                )
+                triggerSnapFeedback()
             }
         }
     }
@@ -128,22 +121,46 @@ struct SessionDetailView: View {
             }
         }
     }
+
+    private func triggerSnapFeedback() {
+        // Trackpad haptic — .levelChange is more pronounced than .alignment
+        // and matches the "snap / click" metaphor better. No-op on hardware
+        // without Force Touch, or when the user is currently driving the
+        // scroll with a mouse rather than the trackpad.
+        NSHapticFeedbackManager.defaultPerformer.perform(
+            .levelChange,
+            performanceTime: .now
+        )
+
+        // Visible fallback — a short accent-line pulse at the scroll
+        // area's bottom edge. Degrades to nothing on non-haptic hardware
+        // users who would otherwise miss the signal entirely.
+        withAnimation(.easeOut(duration: 0.15)) {
+            snapPulse = true
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(260))
+            withAnimation(.easeIn(duration: 0.25)) {
+                snapPulse = false
+            }
+        }
+    }
 }
 
 // MARK: - in-progress indicator
 
+/// Just the spinner, nothing else. Rendered inside the LazyVStack right
+/// after the last entry, so scrolled-up readers don't see it and pinned
+/// readers see a single small spinner trailing the newest message.
 private struct InProgressIndicator: View {
     var body: some View {
-        HStack(spacing: 8) {
+        HStack {
             ProgressView()
                 .controlSize(.small)
-            Text("Session in progress…")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

@@ -40,6 +40,27 @@ final class SessionMessageLoader: ObservableObject {
         watcher?.stop()
     }
 
+    /// True when the transcript's most recent user/assistant turn implies
+    /// Claude Code hasn't finished its reply:
+    ///  - last turn is `.userText` / `.userToolResults` → AI yet to respond
+    ///  - last `.assistantTurn` has a non-"end_turn" `stop_reason`
+    ///    (tool_use, max_tokens, ...)
+    /// Ignores trailing system / attachment / unknown lines so a batch of
+    /// hook outputs after an end_turn doesn't keep the spinner alive.
+    var isInProgress: Bool {
+        for entry in entries.reversed() {
+            switch entry.kind {
+            case .userText, .userToolResults:
+                return true
+            case .assistantTurn(_, _, let stopReason, _):
+                return stopReason != "end_turn"
+            case .systemNote, .attachment, .unknown:
+                continue
+            }
+        }
+        return false
+    }
+
     // MARK: - load
 
     func load(_ summary: SessionSummary) {
