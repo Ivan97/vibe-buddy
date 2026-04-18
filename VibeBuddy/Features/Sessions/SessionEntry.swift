@@ -8,13 +8,22 @@ struct RichText: Hashable, Sendable {
     let raw: String
     let markdown: AttributedString
 
+    /// Upper bound on content we'll try to parse as markdown. Beyond this,
+    /// the parser's cost grows pathologically (observed on 80 KB user
+    /// messages in claude-mem observer sessions) and the inline markup
+    /// affordances stop being useful — big pasted logs look fine in raw.
+    static let markdownParseCeiling = 16_000
+
     init(raw: String) {
         self.raw = raw
-        let parsed = (try? AttributedString(
-            markdown: raw,
-            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        )) ?? AttributedString(raw)
-        self.markdown = parsed
+        if raw.utf8.count > Self.markdownParseCeiling {
+            self.markdown = AttributedString(raw)
+        } else {
+            self.markdown = (try? AttributedString(
+                markdown: raw,
+                options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+            )) ?? AttributedString(raw)
+        }
     }
 }
 

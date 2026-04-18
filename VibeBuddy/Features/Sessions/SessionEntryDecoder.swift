@@ -21,7 +21,11 @@ struct SessionEntryDecoder: Sendable {
         let timestamp = (obj["timestamp"] as? String).flatMap(ISO8601Tolerant.parse)
 
         switch type {
-        case "permission-mode", "last-prompt", "file-history-snapshot", "progress":
+        case "permission-mode",
+             "last-prompt",
+             "file-history-snapshot",
+             "progress",
+             "queue-operation":
             return nil
 
         case "user":

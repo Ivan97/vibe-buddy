@@ -186,7 +186,7 @@ private struct UserTurnView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Text(text.markdown)
+            ExpandableRichText(rich: text)
         }
         .padding(12)
         .background(.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
@@ -242,7 +242,7 @@ private struct AssistantBlockView: View {
     var body: some View {
         switch block {
         case .text(let rich):
-            Text(rich.markdown)
+            ExpandableRichText(rich: rich)
 
         case .thinking(let s):
             DisclosureGroup(isExpanded: $thinkingExpanded) {
@@ -329,6 +329,60 @@ private struct MetaNote: View {
             Spacer()
         }
         .padding(.horizontal, 12)
+    }
+}
+
+// MARK: - expandable text
+
+/// Renders a `RichText` inline up to `threshold` UTF-8 bytes; longer content
+/// shows a truncated preview plus a "Show full" action. Stops SwiftUI Text
+/// layout from blowing up on 80 KB+ user messages (observed in claude-mem
+/// observer-sessions) that pegged CPU and broke LazyVStack virtualization.
+private struct ExpandableRichText: View {
+    let rich: RichText
+    var threshold: Int = 4_000
+    @State private var expanded = false
+
+    var body: some View {
+        if expanded || rich.raw.utf8.count <= threshold {
+            Text(rich.markdown)
+                .textSelection(.enabled)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(truncatedPreview)
+                    .textSelection(.enabled)
+                HStack(spacing: 8) {
+                    Image(systemName: "text.append")
+                        .foregroundStyle(.tertiary)
+                    Text("+\(rich.raw.count - previewCharCount) chars hidden")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                    Button("Show full") { expanded = true }
+                        .buttonStyle(.link)
+                        .font(.caption)
+                }
+                .padding(.top, 2)
+            }
+        }
+    }
+
+    /// Character count used for the preview (approximate — based on the
+    /// UTF-8 byte budget, so mostly-ASCII content clips near `threshold`
+    /// and multibyte content clips earlier).
+    private var previewCharCount: Int {
+        var bytes = 0
+        var chars = 0
+        for ch in rich.raw {
+            bytes += ch.utf8.count
+            if bytes > threshold { break }
+            chars += 1
+        }
+        return chars
+    }
+
+    private var truncatedPreview: String {
+        String(rich.raw.prefix(previewCharCount)) + "…"
     }
 }
 
