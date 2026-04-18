@@ -8,6 +8,7 @@ enum ModuleRoute: String, CaseIterable, Identifiable, Hashable, Sendable {
     case statusline
     case mcp
     case hooks
+    case settings
     case plugins
 
     var id: String { rawValue }
@@ -21,6 +22,7 @@ enum ModuleRoute: String, CaseIterable, Identifiable, Hashable, Sendable {
         case .statusline: return "Statusline"
         case .mcp:        return "MCP"
         case .hooks:      return "Hooks"
+        case .settings:   return "Settings"
         case .plugins:    return "Plugins"
         }
     }
@@ -34,6 +36,7 @@ enum ModuleRoute: String, CaseIterable, Identifiable, Hashable, Sendable {
         case .statusline: return "menubar.rectangle"
         case .mcp:        return "bolt.horizontal"
         case .hooks:      return "link"
+        case .settings:   return "gearshape"
         case .plugins:    return "puzzlepiece.extension"
         }
     }
@@ -42,16 +45,16 @@ enum ModuleRoute: String, CaseIterable, Identifiable, Hashable, Sendable {
     var phase: Int {
         switch self {
         case .sessions, .subagents, .skills, .prompts,
-             .statusline, .mcp, .hooks, .plugins:    return 0
+             .statusline, .mcp, .hooks, .settings, .plugins: return 0
         }
     }
 
     var section: Section {
         switch self {
-        case .sessions:                        return .data
-        case .prompts, .skills, .subagents:    return .authoring
-        case .statusline, .mcp, .hooks:        return .config
-        case .plugins:                         return .ecosystem
+        case .sessions:                            return .data
+        case .prompts, .skills, .subagents:        return .authoring
+        case .statusline, .mcp, .hooks, .settings: return .config
+        case .plugins:                             return .ecosystem
         }
     }
 

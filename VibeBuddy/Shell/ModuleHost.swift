@@ -20,6 +20,8 @@ struct ModuleHost: View {
                 MCPRoot()
             case .hooks:
                 HooksRoot()
+            case .settings:
+                SettingsRoot()
             case .plugins:
                 PluginsRoot()
             case .none:

@@ -11,6 +11,7 @@ struct MainWindowScene: Scene {
     @ObservedObject var pluginsStore: PluginsStore
     @ObservedObject var statuslineStore: StatuslineStore
     @ObservedObject var mcpStore: MCPStore
+    @ObservedObject var settingsStore: SettingsStore
     @ObservedObject var navigator: Navigator
 
     var body: some Scene {
@@ -26,6 +27,7 @@ struct MainWindowScene: Scene {
                 .environmentObject(pluginsStore)
                 .environmentObject(statuslineStore)
                 .environmentObject(mcpStore)
+                .environmentObject(settingsStore)
                 .environmentObject(navigator)
                 .frame(minWidth: 840, minHeight: 520)
                 .task {
