@@ -4,14 +4,22 @@ struct SessionDetailView: View {
     let summary: SessionSummary
     @StateObject private var loader = SessionMessageLoader()
 
-    /// User is currently viewing the bottom of the transcript (close to it).
-    /// When true, new entries auto-scroll the viewport; when false, they
-    /// feed the "N new" counter instead.
+    /// True when the user's viewport includes the tail anchor — i.e. they're
+    /// currently looking at the latest messages. Drives follow-latest and
+    /// the in-progress spinner below.
     @State private var isPinnedToBottom: Bool = true
     @State private var lastKnownCount: Int = 0
-    @State private var unreadNew: Int = 0
+    @State private var now: Date = Date()
+
+    /// Ticks every 15s so the live-spinner can decay if FS events stop
+    /// (a session that goes idle for >5 min no longer shows "in progress").
+    private let liveTicker = Timer.publish(every: 15, on: .main, in: .common).autoconnect()
 
     private static let bottomAnchorID = "bottom-anchor"
+
+    private var isSessionLive: Bool {
+        summary.isLive(now: now)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -40,81 +48,54 @@ struct SessionDetailView: View {
             }
         }
         .onAppear { loader.load(summary) }
+        .onReceive(liveTicker) { now = $0 }
     }
 
     @ViewBuilder
     private var transcript: some View {
         ScrollViewReader { proxy in
-            ZStack(alignment: .bottomTrailing) {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 12) {
-                        if loader.hasMoreAtTop {
-                            TopLoadSentinel(isLoading: loader.isPrepending)
-                                .onAppear { loader.loadOlderIfNeeded() }
-                                .id("top-sentinel")
-                        }
-                        ForEach(loader.entries) { entry in
-                            MessageRow(entry: entry).id(entry.id)
-                        }
-                        // Invisible 1-pt tail anchor. LazyVStack only
-                        // realizes it when the user is at the bottom, so
-                        // onAppear / onDisappear drive `isPinnedToBottom`.
-                        Color.clear
-                            .frame(height: 1)
-                            .id(Self.bottomAnchorID)
-                            .onAppear {
-                                isPinnedToBottom = true
-                                unreadNew = 0
-                            }
-                            .onDisappear {
-                                isPinnedToBottom = false
-                            }
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    if loader.hasMoreAtTop {
+                        TopLoadSentinel(isLoading: loader.isPrepending)
+                            .onAppear { loader.loadOlderIfNeeded() }
+                            .id("top-sentinel")
                     }
-                    .padding(20)
-                }
-                .defaultScrollAnchor(.bottom)      // initial position + resize anchor
-                .textSelection(.enabled)
-                .onChange(of: loader.anchorRequest) { _, newValue in
-                    guard let id = newValue else { return }
-                    var transaction = Transaction()
-                    transaction.disablesAnimations = true
-                    withTransaction(transaction) {
-                        proxy.scrollTo(id, anchor: .top)
+                    ForEach(loader.entries) { entry in
+                        MessageRow(entry: entry).id(entry.id)
                     }
-                    loader.anchorRequest = nil
-                }
-                .onChange(of: loader.entries.count) { _, newCount in
-                    handleCountChange(newCount: newCount, proxy: proxy)
-                }
 
-                if !isPinnedToBottom, unreadNew > 0 {
-                    jumpToLatestButton(proxy: proxy)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-            }
-            .animation(.easeOut(duration: 0.2), value: unreadNew)
-        }
-    }
+                    if isSessionLive {
+                        InProgressIndicator()
+                            .id("in-progress-indicator")
+                    }
 
-    @ViewBuilder
-    private func jumpToLatestButton(proxy: ScrollViewProxy) -> some View {
-        Button {
-            scrollToBottom(proxy: proxy, animated: true)
-            unreadNew = 0
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "arrow.down.circle.fill")
-                Text("\(unreadNew) new")
-                    .font(.caption.bold())
+                    // Invisible 1-pt tail anchor. LazyVStack only realizes
+                    // it when the user is near the bottom, so
+                    // onAppear / onDisappear drive `isPinnedToBottom`.
+                    Color.clear
+                        .frame(height: 1)
+                        .id(Self.bottomAnchorID)
+                        .onAppear { isPinnedToBottom = true }
+                        .onDisappear { isPinnedToBottom = false }
+                }
+                .padding(20)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(.regularMaterial, in: Capsule())
-            .overlay(Capsule().stroke(Color.accentColor.opacity(0.4)))
-            .shadow(radius: 3, y: 1)
+            .defaultScrollAnchor(.bottom)      // initial position + resize anchor
+            .textSelection(.enabled)
+            .onChange(of: loader.anchorRequest) { _, newValue in
+                guard let id = newValue else { return }
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    proxy.scrollTo(id, anchor: .top)
+                }
+                loader.anchorRequest = nil
+            }
+            .onChange(of: loader.entries.count) { _, newCount in
+                handleCountChange(newCount: newCount, proxy: proxy)
+            }
         }
-        .buttonStyle(.plain)
-        .padding(16)
     }
 
     private func handleCountChange(newCount: Int, proxy: ScrollViewProxy) {
@@ -122,35 +103,36 @@ struct SessionDetailView: View {
         lastKnownCount = newCount
         guard delta > 0 else { return }
 
-        if isPinnedToBottom {
-            // Defer one run-loop tick so LazyVStack has laid out the new
-            // rows before we scroll — otherwise `scrollTo` lands at a
-            // position computed from stale content size.
-            DispatchQueue.main.async {
-                scrollToBottom(proxy: proxy, animated: true)
-            }
-        } else {
-            unreadNew += delta
-        }
-    }
+        // Only follow when the user's already at the bottom. Scrolled-up
+        // readers stay exactly where they are — no jump button, no nudge.
+        guard isPinnedToBottom else { return }
 
-    private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool) {
-        // Prefer scrolling to the concrete last entry — it's the newest
-        // message and scrolling to it with `.bottom` anchor keeps it
-        // flush with the viewport bottom. The 1-pt anchor is a fallback
-        // for the very first render while `entries.last` is nil.
-        let target: String = loader.entries.last?.id ?? Self.bottomAnchorID
-        if animated {
+        // Defer one run-loop tick so LazyVStack has laid out the new rows
+        // before we scroll; otherwise `scrollTo` lands based on the stale
+        // (pre-append) content size.
+        DispatchQueue.main.async {
+            let target: String = loader.entries.last?.id ?? Self.bottomAnchorID
             withAnimation(.easeOut(duration: 0.2)) {
                 proxy.scrollTo(target, anchor: .bottom)
             }
-        } else {
-            var txn = Transaction()
-            txn.disablesAnimations = true
-            withTransaction(txn) {
-                proxy.scrollTo(target, anchor: .bottom)
-            }
         }
+    }
+}
+
+// MARK: - in-progress indicator
+
+private struct InProgressIndicator: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text("Session in progress…")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
