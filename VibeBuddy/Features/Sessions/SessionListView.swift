@@ -8,6 +8,12 @@ struct SessionListDetailView: View {
     @EnvironmentObject private var navigator: Navigator
     @State private var selectedID: SessionSummary.ID?
     @State private var searchText: String = ""
+    @State private var hideFinished: Bool = false
+    @State private var now: Date = Date()
+
+    /// Ticks once a minute so the live-dot decays even when no FS events
+    /// fire (a session that goes idle for >5 min stops showing as live).
+    private let ticker = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
     var body: some View {
         HSplitView {
@@ -15,6 +21,9 @@ struct SessionListDetailView: View {
                 summaries: filteredSummaries,
                 selected: $selectedID,
                 searchText: $searchText,
+                hideFinished: $hideFinished,
+                liveCount: store.summaries.filter { $0.isLive(now: now) }.count,
+                now: now,
                 isLoading: store.isLoading,
                 error: store.loadError,
                 onRefresh: { Task { await store.reload() } }
@@ -40,6 +49,7 @@ struct SessionListDetailView: View {
         }
         .onAppear(perform: consumePendingOpen)
         .onChange(of: navigator.pendingSessionID) { _, _ in consumePendingOpen() }
+        .onReceive(ticker) { now = $0 }
     }
 
     private func consumePendingOpen() {
@@ -49,9 +59,13 @@ struct SessionListDetailView: View {
     }
 
     private var filteredSummaries: [SessionSummary] {
-        guard !searchText.isEmpty else { return store.summaries }
+        var result = store.summaries
+        if hideFinished {
+            result = result.filter { $0.isLive(now: now) }
+        }
+        guard !searchText.isEmpty else { return result }
         let q = searchText.lowercased()
-        return store.summaries.filter { s in
+        return result.filter { s in
             (s.firstPrompt?.lowercased().contains(q) ?? false)
                 || s.projectPath.lowercased().contains(q)
                 || s.id.lowercased().contains(q)
@@ -68,6 +82,9 @@ private struct SessionListView: View {
     let summaries: [SessionSummary]
     @Binding var selected: SessionSummary.ID?
     @Binding var searchText: String
+    @Binding var hideFinished: Bool
+    let liveCount: Int
+    let now: Date
     let isLoading: Bool
     let error: String?
     let onRefresh: () -> Void
@@ -90,6 +107,8 @@ private struct SessionListView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
 
+            filterBar
+
             Divider()
 
             if let error {
@@ -103,9 +122,9 @@ private struct SessionListView: View {
 
             List(selection: $selected) {
                 ForEach(groupedByProject, id: \.key) { group in
-                    Section(header: ProjectHeader(path: group.key)) {
+                    Section(header: ProjectHeader(path: group.key, liveCount: group.value.filter { $0.isLive(now: now) }.count)) {
                         ForEach(group.value) { summary in
-                            SessionRow(summary: summary)
+                            SessionRow(summary: summary, now: now)
                                 .tag(summary.id as SessionSummary.ID?)
                         }
                     }
@@ -115,17 +134,51 @@ private struct SessionListView: View {
             .overlay {
                 if summaries.isEmpty, !isLoading {
                     ContentUnavailableView(
-                        searchText.isEmpty ? "No sessions" : "No matching sessions",
+                        emptyTitle,
                         systemImage: "bubble.left.and.bubble.right",
-                        description: Text(searchText.isEmpty
-                            ? "Run Claude Code in any project to start recording sessions here."
-                            : "Try a different query.")
+                        description: Text(emptyDescription)
                     )
                 } else if isLoading, summaries.isEmpty {
                     ProgressView()
                 }
             }
         }
+    }
+
+    private var filterBar: some View {
+        HStack(spacing: 6) {
+            if liveCount > 0 {
+                HStack(spacing: 4) {
+                    Circle().fill(.green).frame(width: 6, height: 6)
+                    Text("\(liveCount) live")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            Toggle(isOn: $hideFinished) {
+                Label("Hide finished", systemImage: "eye.slash")
+                    .font(.caption)
+                    .labelStyle(.titleAndIcon)
+            }
+            .toggleStyle(.button)
+            .controlSize(.small)
+            .help("Hide sessions that haven't been updated in the last 5 minutes")
+        }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 6)
+    }
+
+    private var emptyTitle: String {
+        if !searchText.isEmpty { return "No matching sessions" }
+        if hideFinished { return "No live sessions" }
+        return "No sessions"
+    }
+
+    private var emptyDescription: String {
+        if !searchText.isEmpty { return "Try a different query." }
+        if hideFinished { return "Every visible session has been idle for 5+ minutes. Toggle Hide finished off to see them." }
+        return "Run Claude Code in any project to start recording sessions here."
     }
 
     /// Sessions grouped by projectPath, ordered by each group's most recent
@@ -142,12 +195,16 @@ private struct SessionListView: View {
 
 private struct ProjectHeader: View {
     let path: String
+    let liveCount: Int
 
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "folder")
             Text(displayName)
                 .font(.caption.bold())
+            if liveCount > 0 {
+                Circle().fill(.green).frame(width: 5, height: 5)
+            }
             Spacer()
         }
         .help(path)
@@ -161,26 +218,44 @@ private struct ProjectHeader: View {
 
 private struct SessionRow: View {
     let summary: SessionSummary
+    let now: Date
+
+    private var isLive: Bool { summary.isLive(now: now) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(summary.firstPrompt ?? "(no prompt)")
-                .font(.body)
-                .lineLimit(2)
+        HStack(alignment: .top, spacing: 8) {
+            // Liveness indicator reserves a column so text aligns whether or
+            // not the dot is visible.
+            Circle()
+                .fill(isLive ? Color.green : Color.clear)
+                .frame(width: 6, height: 6)
+                .padding(.top, 6)
 
-            HStack(spacing: 6) {
-                Text(summary.lastActivity, format: .relative(presentation: .numeric, unitsStyle: .narrow))
-                Text("·")
-                Text("\(summary.messageCount) msgs")
-                if let branch = summary.gitBranch, !branch.isEmpty, branch != "HEAD" {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(summary.firstPrompt ?? "(no prompt)")
+                    .font(.body)
+                    .lineLimit(2)
+
+                HStack(spacing: 6) {
+                    if isLive {
+                        Text("live")
+                            .font(.caption2.bold())
+                            .foregroundStyle(.green)
+                        Text("·")
+                    }
+                    Text(summary.lastActivity, format: .relative(presentation: .numeric, unitsStyle: .narrow))
                     Text("·")
-                    Label(branch, systemImage: "arrow.triangle.branch")
-                        .labelStyle(.titleAndIcon)
-                        .lineLimit(1)
+                    Text("\(summary.messageCount) msgs")
+                    if let branch = summary.gitBranch, !branch.isEmpty, branch != "HEAD" {
+                        Text("·")
+                        Label(branch, systemImage: "arrow.triangle.branch")
+                            .labelStyle(.titleAndIcon)
+                            .lineLimit(1)
+                    }
                 }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
         }
         .padding(.vertical, 2)
     }

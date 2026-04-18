@@ -4,6 +4,13 @@ struct SessionDetailView: View {
     let summary: SessionSummary
     @StateObject private var loader = SessionMessageLoader()
 
+    @State private var isPinnedToBottom: Bool = true
+    @State private var hasDoneInitialScroll: Bool = false
+    @State private var lastKnownCount: Int = 0
+    @State private var unreadNew: Int = 0
+
+    private static let bottomAnchorID = "bottom-anchor"
+
     var body: some View {
         VStack(spacing: 0) {
             DetailHeader(summary: summary)
@@ -30,38 +37,131 @@ struct SessionDetailView: View {
                 }
             }
         }
-        .onAppear { loader.load(summary) }
-        .onChange(of: summary) { _, new in loader.load(new) }
+        .onAppear {
+            loader.load(summary)
+            resetFollowState()
+        }
+        .onChange(of: summary) { _, new in
+            loader.load(new)
+            resetFollowState()
+        }
+    }
+
+    private func resetFollowState() {
+        isPinnedToBottom = true
+        hasDoneInitialScroll = false
+        lastKnownCount = 0
+        unreadNew = 0
     }
 
     @ViewBuilder
     private var transcript: some View {
         ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
-                    if loader.hasMoreAtTop {
-                        TopLoadSentinel(isLoading: loader.isPrepending)
-                            .task(id: loader.entries.first?.id) {
-                                loader.loadOlderIfNeeded()
+            ZStack(alignment: .bottomTrailing) {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        if loader.hasMoreAtTop {
+                            TopLoadSentinel(isLoading: loader.isPrepending)
+                                .task(id: loader.entries.first?.id) {
+                                    loader.loadOlderIfNeeded()
+                                }
+                                .id("top-sentinel")
+                        }
+                        ForEach(loader.entries) { entry in
+                            MessageRow(entry: entry).id(entry.id)
+                        }
+                        // Invisible 1-pt bottom anchor. LazyVStack realizes
+                        // it only when the user is at the bottom, so
+                        // onAppear / onDisappear give us a cheap
+                        // "is-the-user-pinned" signal.
+                        Color.clear
+                            .frame(height: 1)
+                            .id(Self.bottomAnchorID)
+                            .onAppear {
+                                isPinnedToBottom = true
+                                unreadNew = 0
                             }
-                            .id("top-sentinel")
+                            .onDisappear {
+                                isPinnedToBottom = false
+                            }
                     }
-                    ForEach(loader.entries) { entry in
-                        MessageRow(entry: entry).id(entry.id)
+                    .padding(20)
+                }
+                .textSelection(.enabled)
+                .onChange(of: loader.anchorRequest) { _, newValue in
+                    guard let id = newValue else { return }
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
+                        proxy.scrollTo(id, anchor: .top)
                     }
+                    loader.anchorRequest = nil
                 }
-                .padding(20)
-            }
-            .textSelection(.enabled)
-            .onChange(of: loader.anchorRequest) { _, newValue in
-                guard let id = newValue else { return }
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    proxy.scrollTo(id, anchor: .top)
+                .onChange(of: loader.entries.count) { _, newCount in
+                    handleCountChange(newCount: newCount, proxy: proxy)
                 }
-                loader.anchorRequest = nil
+
+                if !isPinnedToBottom, unreadNew > 0 {
+                    jumpToLatestButton(proxy: proxy)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
+            .animation(.easeOut(duration: 0.2), value: unreadNew)
+        }
+    }
+
+    @ViewBuilder
+    private func jumpToLatestButton(proxy: ScrollViewProxy) -> some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+            }
+            unreadNew = 0
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.down.circle.fill")
+                Text("\(unreadNew) new")
+                    .font(.caption.bold())
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.regularMaterial, in: Capsule())
+            .overlay(Capsule().stroke(Color.accentColor.opacity(0.4)))
+            .shadow(radius: 3, y: 1)
+        }
+        .buttonStyle(.plain)
+        .padding(16)
+    }
+
+    private func handleCountChange(newCount: Int, proxy: ScrollViewProxy) {
+        let delta = newCount - lastKnownCount
+        lastKnownCount = newCount
+
+        // First time entries show up: scroll to the bottom so the user
+        // lands on the latest turn rather than the top of the decoded
+        // window (500 entries back from the end).
+        if !hasDoneInitialScroll, newCount > 0 {
+            hasDoneInitialScroll = true
+            DispatchQueue.main.async {
+                var txn = Transaction()
+                txn.disablesAnimations = true
+                withTransaction(txn) {
+                    proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+                }
+            }
+            return
+        }
+
+        guard delta > 0 else { return }
+
+        if isPinnedToBottom {
+            // Follow-latest: scroll the newly appended rows into view.
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+            }
+        } else {
+            // User is reading history; accumulate for the jump button.
+            unreadNew += delta
         }
     }
 }
