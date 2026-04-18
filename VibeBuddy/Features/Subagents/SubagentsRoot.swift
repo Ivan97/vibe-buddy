@@ -32,7 +32,7 @@ private struct SubagentsShell: View {
                 onNewAgent: { showNewAgentSheet = true },
                 onRefresh: { Task { await store.reload() } }
             )
-            .frame(minWidth: 260, idealWidth: 320)
+            .frame(minWidth: 260, idealWidth: 320, maxWidth: 400)
 
             Group {
                 if let handle = selectedHandle {
@@ -42,7 +42,7 @@ private struct SubagentsShell: View {
                     EmptyDetailView()
                 }
             }
-            .frame(minWidth: 420)
+            .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
         }
         .sheet(isPresented: $showNewAgentSheet) {
             NewAgentSheet(store: store) { handle in

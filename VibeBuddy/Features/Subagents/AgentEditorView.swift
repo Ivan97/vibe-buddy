@@ -27,6 +27,7 @@ struct AgentEditorView: View {
                 editor
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear(perform: loadDocument)
         .alert("Delete \(handle.name)?", isPresented: $showDeleteConfirm) {
             Button("Delete", role: .destructive) { performDelete() }
