@@ -14,6 +14,13 @@ struct ClaudeHome: Sendable, Equatable {
     var skillsDir: URL { url.appending(path: "skills", directoryHint: .isDirectory) }
     var pluginsDir: URL { url.appending(path: "plugins", directoryHint: .isDirectory) }
 
+    /// `~/.claude.json` — the main per-user config file that sits alongside
+    /// the `.claude/` directory (NOT inside it). Claude Code stores
+    /// `mcpServers`, tips state, and various UI flags here.
+    var mainConfigFile: URL {
+        url.deletingLastPathComponent().appending(path: ".claude.json")
+    }
+
     static let envOverrideKey = "CLAUDE_CONFIG_DIR"
 
     /// Resolves the effective config directory from the environment and home

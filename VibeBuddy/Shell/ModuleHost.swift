@@ -14,12 +14,14 @@ struct ModuleHost: View {
                 SkillsRoot()
             case .prompts:
                 PromptsRoot()
+            case .statusline:
+                StatuslineRoot()
+            case .mcp:
+                MCPRoot()
             case .hooks:
                 HooksRoot()
             case .plugins:
                 PluginsRoot()
-            case .statusline, .mcp:
-                ComingSoonView(route: route!)
             case .none:
                 EmptySelectionView()
             }

@@ -9,6 +9,8 @@ struct MainWindowScene: Scene {
     @ObservedObject var commandStore: CommandStore
     @ObservedObject var hooksStore: HooksStore
     @ObservedObject var pluginsStore: PluginsStore
+    @ObservedObject var statuslineStore: StatuslineStore
+    @ObservedObject var mcpStore: MCPStore
     @ObservedObject var navigator: Navigator
 
     var body: some Scene {
@@ -22,6 +24,8 @@ struct MainWindowScene: Scene {
                 .environmentObject(commandStore)
                 .environmentObject(hooksStore)
                 .environmentObject(pluginsStore)
+                .environmentObject(statuslineStore)
+                .environmentObject(mcpStore)
                 .environmentObject(navigator)
                 .frame(minWidth: 840, minHeight: 520)
                 .task {

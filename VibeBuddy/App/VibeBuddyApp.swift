@@ -11,6 +11,8 @@ struct VibeBuddyApp: App {
     @StateObject private var commandStore = CommandStore()
     @StateObject private var hooksStore = HooksStore()
     @StateObject private var pluginsStore = PluginsStore()
+    @StateObject private var statuslineStore = StatuslineStore()
+    @StateObject private var mcpStore = MCPStore()
     @StateObject private var navigator = Navigator()
 
     var body: some Scene {
@@ -23,6 +25,8 @@ struct VibeBuddyApp: App {
             commandStore: commandStore,
             hooksStore: hooksStore,
             pluginsStore: pluginsStore,
+            statuslineStore: statuslineStore,
+            mcpStore: mcpStore,
             navigator: navigator
         )
         MenuBarScene(
