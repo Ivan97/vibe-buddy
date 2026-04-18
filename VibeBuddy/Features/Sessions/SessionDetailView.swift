@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct SessionDetailView: View {
@@ -94,6 +95,16 @@ struct SessionDetailView: View {
             }
             .onChange(of: loader.entries.count) { _, newCount in
                 handleCountChange(newCount: newCount, proxy: proxy)
+            }
+            .onChange(of: isPinnedToBottom) { _, _ in
+                // Magnetic feel — the trackpad emits a subtle click on each
+                // pin engage / release. `.alignment` is Apple's designated
+                // snap/alignment pattern; works on Force Touch and Magic
+                // Trackpad, no-ops elsewhere.
+                NSHapticFeedbackManager.defaultPerformer.perform(
+                    .alignment,
+                    performanceTime: .now
+                )
             }
         }
     }
