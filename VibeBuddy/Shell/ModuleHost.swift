@@ -8,7 +8,9 @@ struct ModuleHost: View {
             switch route {
             case .sessions:
                 SessionsRoot()
-            case .prompts, .skills, .subagents,
+            case .subagents:
+                SubagentsRoot()
+            case .prompts, .skills,
                  .statusline, .mcp, .hooks,
                  .plugins:
                 ComingSoonView(route: route!)

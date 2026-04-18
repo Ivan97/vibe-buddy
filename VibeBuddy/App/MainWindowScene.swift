@@ -3,6 +3,7 @@ import SwiftUI
 struct MainWindowScene: Scene {
     @ObservedObject var updater: SparkleUpdaterController
     @ObservedObject var sessionStore: SessionStore
+    @ObservedObject var agentStore: AgentStore
     @ObservedObject var navigator: Navigator
 
     var body: some Scene {
@@ -10,6 +11,7 @@ struct MainWindowScene: Scene {
             AppShellView()
                 .environmentObject(updater)
                 .environmentObject(sessionStore)
+                .environmentObject(agentStore)
                 .environmentObject(navigator)
                 .frame(minWidth: 840, minHeight: 520)
                 .task {
