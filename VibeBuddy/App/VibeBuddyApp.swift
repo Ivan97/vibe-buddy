@@ -7,6 +7,8 @@ struct VibeBuddyApp: App {
     @StateObject private var sessionStore = SessionStore()
     @StateObject private var agentStore = AgentStore()
     @StateObject private var skillStore = SkillStore()
+    @StateObject private var hooksStore = HooksStore()
+    @StateObject private var pluginsStore = PluginsStore()
     @StateObject private var navigator = Navigator()
 
     var body: some Scene {
@@ -15,6 +17,8 @@ struct VibeBuddyApp: App {
             sessionStore: sessionStore,
             agentStore: agentStore,
             skillStore: skillStore,
+            hooksStore: hooksStore,
+            pluginsStore: pluginsStore,
             navigator: navigator
         )
         MenuBarScene(

@@ -5,6 +5,8 @@ struct MainWindowScene: Scene {
     @ObservedObject var sessionStore: SessionStore
     @ObservedObject var agentStore: AgentStore
     @ObservedObject var skillStore: SkillStore
+    @ObservedObject var hooksStore: HooksStore
+    @ObservedObject var pluginsStore: PluginsStore
     @ObservedObject var navigator: Navigator
 
     var body: some Scene {
@@ -14,6 +16,8 @@ struct MainWindowScene: Scene {
                 .environmentObject(sessionStore)
                 .environmentObject(agentStore)
                 .environmentObject(skillStore)
+                .environmentObject(hooksStore)
+                .environmentObject(pluginsStore)
                 .environmentObject(navigator)
                 .frame(minWidth: 840, minHeight: 520)
                 .task {
