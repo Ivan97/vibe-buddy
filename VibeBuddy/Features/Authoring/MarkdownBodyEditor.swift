@@ -44,19 +44,24 @@ struct MarkdownBodyEditor: View {
 /// Markdown with real block-level layout (headers sized, lists bulleted,
 /// code blocks fenced, tables, blockquotes, task lists).
 ///
-/// Falls back to a plain monospaced view for content past a 16 KB UTF-8
-/// ceiling; MarkdownUI's parse on huge inputs can stall the main thread
-/// and the inline styling is wasted on big pasted logs anyway.
+/// Falls back to plain monospaced text above a 256 KB UTF-8 ceiling.
+/// Rationale: unlike the transcript (where 500 entries are parsed on open
+/// and LazyVStack keeps re-measuring), preview renders a single document
+/// the user explicitly picked, so one-shot parsing of 20-100 KB bodies is
+/// fine. Agent system prompts and SKILL.md files commonly sit in the
+/// 15-25 KB range.
 private struct MarkdownPreview: View {
     let raw: String
     let minHeight: CGFloat
+
+    private static let parseCeiling = 256_000
 
     var body: some View {
         ScrollView {
             Group {
                 if raw.isEmpty {
                     emptyState
-                } else if raw.utf8.count > 16_000 {
+                } else if raw.utf8.count > Self.parseCeiling {
                     Text(raw)
                         .font(.system(.body, design: .monospaced))
                         .textSelection(.enabled)
