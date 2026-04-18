@@ -96,13 +96,33 @@ struct SessionDetailView: View {
             .defaultScrollAnchor(.bottom)      // initial position + resize anchor
             .textSelection(.enabled)
             .overlay(alignment: .bottom) {
-                // Visual snap cue — a short accent-colored line pulses at
-                // the viewport's bottom edge when pin engages or releases.
-                // Kept for users whose trackpad doesn't do Force Touch.
-                Rectangle()
-                    .fill(Color.accentColor.opacity(snapPulse ? 0.55 : 0))
-                    .frame(height: 2)
-                    .allowsHitTesting(false)
+                ZStack(alignment: .bottom) {
+                    // Persistent "magnetic pull" glow — visible while
+                    // pinned, fades to zero when the user scrolls away.
+                    // Gives an ongoing hint that the view is attached
+                    // to the bottom edge.
+                    LinearGradient(
+                        colors: [
+                            Color.accentColor.opacity(isPinnedToBottom ? 0.18 : 0),
+                            Color.accentColor.opacity(0)
+                        ],
+                        startPoint: .bottom,
+                        endPoint: .top
+                    )
+                    .frame(height: 42)
+                    .animation(.easeInOut(duration: 0.25), value: isPinnedToBottom)
+
+                    // Sharp 2-pt accent line along the very bottom while
+                    // pinned — reinforces the "attached" feel. Slightly
+                    // brighter during the transition pulse.
+                    Rectangle()
+                        .fill(Color.accentColor.opacity(
+                            snapPulse ? 0.65 : (isPinnedToBottom ? 0.25 : 0)
+                        ))
+                        .frame(height: 2)
+                        .animation(.easeInOut(duration: 0.25), value: isPinnedToBottom)
+                }
+                .allowsHitTesting(false)
             }
             .onChange(of: loader.anchorRequest) { _, newValue in
                 guard let id = newValue else { return }
