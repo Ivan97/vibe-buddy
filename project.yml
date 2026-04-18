@@ -59,8 +59,13 @@ targets:
         NSPrincipalClass: NSApplication
         NSSupportsAutomaticTermination: true
         NSSupportsSuddenTermination: true
-        SUFeedURL: "https://example.com/vibebuddy/appcast.xml"
-        SUPublicEDKey: ""
+        # GitHub Pages serves appcast.xml from the repo root. If Pages isn't
+        # enabled yet, swap to raw.githubusercontent.com (see docs/RELEASING.md).
+        SUFeedURL: "https://ivan97.github.io/vibe-buddy/appcast.xml"
+        # ed25519 public key generated via `make sparkle-keys`. The matching
+        # private key lives in the build machine's Keychain; rotating means
+        # existing clients can't accept updates signed with a new key.
+        SUPublicEDKey: "X3ktgdREKn4UrqN4/iWpRNe2+61PYVBJn+I9ATGMZWU="
         SUEnableAutomaticChecks: true
         SUScheduledCheckInterval: 86400
         SentryDSN: ""
