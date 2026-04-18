@@ -1,48 +1,157 @@
 import Foundation
 
+/// Drives transcript rendering: builds a byte-offset index for the session's
+/// jsonl file, decodes the most recent `windowSize` entries on open, and
+/// prepends older batches as the view scrolls up. Appends new entries to the
+/// tail when the file grows (observed via a per-loader FSEvents watcher).
 @MainActor
 final class SessionMessageLoader: ObservableObject {
     @Published private(set) var entries: [SessionEntry] = []
-    @Published private(set) var isLoading: Bool = false
+    @Published private(set) var isInitialLoading: Bool = false
+    @Published private(set) var isPrepending: Bool = false
+    @Published private(set) var hasMoreAtTop: Bool = false
+    @Published private(set) var totalLineCount: Int = 0
     @Published private(set) var loadError: String?
 
-    private var currentTask: Task<Void, Never>?
+    /// View observes this and calls `ScrollViewReader.scrollTo(id, anchor: .top)`
+    /// after a prepend to keep the user's viewport fixed on the same entry.
+    @Published var anchorRequest: SessionEntry.ID?
+
+    /// Entries per batch (forward append uses whatever the file grew by;
+    /// backward prepend decodes until this many *decoded* entries are
+    /// produced or the start of file is hit).
+    private let windowSize: Int
+
+    private var currentSummary: SessionSummary?
+    private var backend: SessionFileBackend?
+    private var topCursor: Int = 0
+    private var watcher: DirectoryWatcher?
+
+    init(windowSize: Int = 500) {
+        self.windowSize = windowSize
+    }
+
+    deinit {
+        watcher?.stop()
+    }
+
+    // MARK: - load
 
     func load(_ summary: SessionSummary) {
-        currentTask?.cancel()
+        stopWatching()
+        currentSummary = summary
         entries = []
-        isLoading = true
+        isInitialLoading = true
+        isPrepending = false
+        hasMoreAtTop = false
+        totalLineCount = 0
         loadError = nil
 
         let url = summary.path
-        currentTask = Task { [weak self] in
-            let result = await Task.detached(priority: .userInitiated) {
-                Self.decode(url: url)
-            }.value
+        let window = windowSize
+        Task { [weak self] in
+            do {
+                let backend = try SessionFileBackend(url: url)
+                let total = await backend.lineCount
+                let (initial, cursor) = await backend.decodeBackwards(
+                    from: total,
+                    minEntries: window
+                )
 
-            guard let self, !Task.isCancelled else { return }
-            isLoading = false
-            switch result {
-            case .success(let list):
-                entries = list
-            case .failure(let error):
-                loadError = (error as NSError).localizedDescription
+                guard let self, self.currentSummary?.path == url else { return }
+                self.backend = backend
+                self.entries = initial
+                self.totalLineCount = total
+                self.topCursor = cursor
+                self.hasMoreAtTop = cursor > 0
+                self.isInitialLoading = false
+                self.startWatching()
+            } catch {
+                guard let self, self.currentSummary?.path == url else { return }
+                self.loadError = (error as NSError).localizedDescription
+                self.isInitialLoading = false
             }
         }
     }
 
-    nonisolated private static func decode(url: URL) -> Result<[SessionEntry], Error> {
-        let decoder = SessionEntryDecoder()
-        var out: [SessionEntry] = []
-        do {
-            try JSONLReader(url: url).forEachLine { line in
-                if let entry = decoder.decode(line) {
-                    out.append(entry)
-                }
+    // MARK: - older batch
+
+    /// Safe to call from `.onAppear` of a top sentinel — guards against
+    /// concurrent or no-op invocations.
+    func loadOlderIfNeeded() {
+        guard
+            !isPrepending,
+            hasMoreAtTop,
+            let backend,
+            currentSummary != nil
+        else { return }
+
+        isPrepending = true
+        let anchorID = entries.first?.id
+        let priorCursor = topCursor
+        let window = windowSize
+
+        Task { [weak self] in
+            let (older, newCursor) = await backend.decodeBackwards(
+                from: priorCursor,
+                minEntries: window
+            )
+
+            guard let self else { return }
+            if !older.isEmpty {
+                self.entries.insert(contentsOf: older, at: 0)
             }
-            return .success(out)
-        } catch {
-            return .failure(error)
+            self.topCursor = newCursor
+            self.hasMoreAtTop = newCursor > 0
+            self.isPrepending = false
+            if !older.isEmpty, let anchorID {
+                self.anchorRequest = anchorID
+            }
+        }
+    }
+
+    // MARK: - file watching / bottom append
+
+    private func startWatching() {
+        guard let summary = currentSummary, watcher == nil else { return }
+        let dir = summary.path.deletingLastPathComponent()
+        let targetPath = summary.path
+        let w = DirectoryWatcher(url: dir) { [weak self] in
+            Task { @MainActor in
+                self?.onFileEvent(target: targetPath)
+            }
+        }
+        w.start()
+        watcher = w
+    }
+
+    private func stopWatching() {
+        watcher?.stop()
+        watcher = nil
+    }
+
+    private func onFileEvent(target: URL) {
+        guard
+            let backend,
+            currentSummary?.path == target
+        else { return }
+
+        Task { [weak self] in
+            let added: Int
+            do {
+                added = try await backend.refreshIfGrown()
+            } catch {
+                return  // transient, will retry on next event
+            }
+            guard added > 0, let self else { return }
+
+            let oldTotal = self.totalLineCount
+            let newTotal = await backend.lineCount
+            guard newTotal > oldTotal else { return }
+
+            let newEntries = await backend.decode(linesIn: oldTotal..<newTotal)
+            self.entries.append(contentsOf: newEntries)
+            self.totalLineCount = newTotal
         }
     }
 }

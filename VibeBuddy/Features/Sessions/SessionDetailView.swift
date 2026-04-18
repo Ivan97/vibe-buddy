@@ -10,7 +10,7 @@ struct SessionDetailView: View {
             Divider()
 
             Group {
-                if loader.isLoading && loader.entries.isEmpty {
+                if loader.isInitialLoading && loader.entries.isEmpty {
                     ProgressView("Loading transcript…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let err = loader.loadError {
@@ -26,19 +26,61 @@ struct SessionDetailView: View {
                         description: Text("This session has no user / assistant turns to show.")
                     )
                 } else {
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 12) {
-                            ForEach(loader.entries) { entry in
-                                MessageRow(entry: entry)
-                            }
-                        }
-                        .padding(20)
-                    }
+                    transcript
                 }
             }
         }
         .onAppear { loader.load(summary) }
         .onChange(of: summary) { _, new in loader.load(new) }
+    }
+
+    @ViewBuilder
+    private var transcript: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    if loader.hasMoreAtTop {
+                        TopLoadSentinel(isLoading: loader.isPrepending)
+                            .onAppear { loader.loadOlderIfNeeded() }
+                            .id("top-sentinel")
+                    }
+                    ForEach(loader.entries) { entry in
+                        MessageRow(entry: entry).id(entry.id)
+                    }
+                }
+                .padding(20)
+            }
+            .onChange(of: loader.anchorRequest) { _, newValue in
+                guard let id = newValue else { return }
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    proxy.scrollTo(id, anchor: .top)
+                }
+                loader.anchorRequest = nil
+            }
+        }
+    }
+}
+
+private struct TopLoadSentinel: View {
+    let isLoading: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Spacer()
+            if isLoading {
+                ProgressView().controlSize(.small)
+                Text("Loading older messages…")
+            } else {
+                Image(systemName: "arrow.up.circle")
+                Text("Scroll up for older messages")
+            }
+            Spacer()
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding(.vertical, 10)
     }
 }
 
