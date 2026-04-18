@@ -126,7 +126,7 @@ struct AgentEditorView: View {
                 Divider().padding(.vertical, 2)
 
                 LabeledRow("System prompt / body") {
-                    MarkdownEditor(
+                    MarkdownBodyEditor(
                         text: $bodyText,
                         placeholder: "You are…",
                         minHeight: 360
