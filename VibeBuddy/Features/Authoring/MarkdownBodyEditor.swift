@@ -1,3 +1,4 @@
+import MarkdownUI
 import SwiftUI
 
 /// Body editor with a Preview / Edit toggle. Defaults to Preview so reading
@@ -39,10 +40,13 @@ struct MarkdownBodyEditor: View {
     }
 }
 
-/// Read-only markdown preview. Uses `AttributedString(markdown:)` with inline
-/// interpretation preserving whitespace — same trade-off as the transcript
-/// renderer. Skips parsing entirely for content past a 16 KB UTF-8 ceiling
-/// (same pathological-parser guard as `RichText`).
+/// Read-only markdown preview rendered via MarkdownUI — GitHub-flavored
+/// Markdown with real block-level layout (headers sized, lists bulleted,
+/// code blocks fenced, tables, blockquotes, task lists).
+///
+/// Falls back to a plain monospaced view for content past a 16 KB UTF-8
+/// ceiling; MarkdownUI's parse on huge inputs can stall the main thread
+/// and the inline styling is wasted on big pasted logs anyway.
 private struct MarkdownPreview: View {
     let raw: String
     let minHeight: CGFloat
@@ -52,9 +56,16 @@ private struct MarkdownPreview: View {
             Group {
                 if raw.isEmpty {
                     emptyState
-                } else {
-                    Text(attributed)
+                } else if raw.utf8.count > 16_000 {
+                    Text(raw)
+                        .font(.system(.body, design: .monospaced))
                         .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                } else {
+                    Markdown(raw)
+                        .textSelection(.enabled)
+                        .markdownTheme(.gitHub)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
                 }
@@ -81,15 +92,5 @@ private struct MarkdownPreview: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-    }
-
-    private var attributed: AttributedString {
-        if raw.utf8.count > 16_000 {
-            return AttributedString(raw)
-        }
-        return (try? AttributedString(
-            markdown: raw,
-            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        )) ?? AttributedString(raw)
     }
 }

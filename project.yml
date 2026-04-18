@@ -32,6 +32,9 @@ packages:
   ConfettiSwiftUI:
     url: https://github.com/simibac/ConfettiSwiftUI
     from: "2.0.0"
+  MarkdownUI:
+    url: https://github.com/gonzalezreal/swift-markdown-ui
+    from: "2.0.0"
 
 targets:
   VibeBuddy:
@@ -73,6 +76,8 @@ targets:
         product: Sentry
       - package: ConfettiSwiftUI
         product: ConfettiSwiftUI
+      - package: MarkdownUI
+        product: MarkdownUI
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: tech.iooo.vibebuddy
