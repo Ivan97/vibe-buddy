@@ -11,6 +11,7 @@ struct AgentEditorView: View {
     @State private var saveError: String?
     @State private var isSaving: Bool = false
     @State private var showDeleteConfirm: Bool = false
+    @State private var pendingSave: FrontmatterDocument<AgentFrontmatter>?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,6 +35,20 @@ struct AgentEditorView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Removes \(handle.url.lastPathComponent) from disk. A .bak sibling is kept.")
+        }
+        .sheet(isPresented: Binding(
+            get: { pendingSave != nil },
+            set: { if !$0 { pendingSave = nil } }
+        )) {
+            if let doc = pendingSave, let original {
+                DiffPreviewSheet(
+                    title: "Save changes to \(handle.name)?",
+                    message: handle.url.path(percentEncoded: false),
+                    beforeText: original.serialized(),
+                    afterText: doc.serialized(),
+                    onConfirm: { commitSave(doc) }
+                )
+            }
         }
     }
 
@@ -185,9 +200,17 @@ struct AgentEditorView: View {
     }
 
     private func performSave() {
+        let doc = FrontmatterDocument(schema: schema, body: bodyText)
+        if original != nil {
+            pendingSave = doc
+        } else {
+            commitSave(doc)
+        }
+    }
+
+    private func commitSave(_ doc: FrontmatterDocument<AgentFrontmatter>) {
         isSaving = true
         defer { isSaving = false }
-        let doc = FrontmatterDocument(schema: schema, body: bodyText)
         do {
             _ = try store.save(doc, to: handle)
             original = doc
@@ -195,6 +218,7 @@ struct AgentEditorView: View {
         } catch {
             saveError = (error as NSError).localizedDescription
         }
+        pendingSave = nil
     }
 
     private func performDelete() {

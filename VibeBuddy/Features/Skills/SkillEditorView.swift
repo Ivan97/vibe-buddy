@@ -11,6 +11,7 @@ struct SkillEditorView: View {
     @State private var saveError: String?
     @State private var isSaving: Bool = false
     @State private var showDeleteConfirm: Bool = false
+    @State private var pendingSave: FrontmatterDocument<SkillFrontmatter>?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -43,6 +44,20 @@ struct SkillEditorView: View {
                 Text("Removes the symlink at \(handle.displayURL.lastPathComponent). The source bundle at \(target.path) is NOT touched.")
             } else {
                 Text("Removes the skill directory \(handle.displayURL.lastPathComponent) from disk.")
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { pendingSave != nil },
+            set: { if !$0 { pendingSave = nil } }
+        )) {
+            if let doc = pendingSave, let original {
+                DiffPreviewSheet(
+                    title: "Save changes to \(handle.name)?",
+                    message: handle.skillMdURL.path(percentEncoded: false),
+                    beforeText: original.serialized(),
+                    afterText: doc.serialized(),
+                    onConfirm: { commitSave(doc) }
+                )
             }
         }
     }
@@ -252,9 +267,17 @@ struct SkillEditorView: View {
     }
 
     private func performSave() {
+        let doc = FrontmatterDocument(schema: schema, body: bodyText)
+        if original != nil {
+            pendingSave = doc
+        } else {
+            commitSave(doc)
+        }
+    }
+
+    private func commitSave(_ doc: FrontmatterDocument<SkillFrontmatter>) {
         isSaving = true
         defer { isSaving = false }
-        let doc = FrontmatterDocument(schema: schema, body: bodyText)
         do {
             _ = try store.save(doc, to: handle)
             original = doc
@@ -262,6 +285,7 @@ struct SkillEditorView: View {
         } catch {
             saveError = (error as NSError).localizedDescription
         }
+        pendingSave = nil
     }
 
     private func performDelete() {
