@@ -1,8 +1,8 @@
 # Phase 1 · Markdown + Frontmatter 编辑三件套
 
-**状态**：🚧 进行中（基础设施 + Subagents 模块已落地；Prompts / Skills 待做）
-**时间窗**：2026-04-18 起
-**Git 范围**：`e56a527` → HEAD（Subagents 模块结束点）
+**状态**：✅ 完成（Subagents / Prompts / Skills 三模块 + 保存前 diff 预览均已落地）
+**时间窗**：2026-04-18
+**Git 范围**：`e56a527` → `447a0d9`
 
 ## 目标
 
@@ -131,36 +131,40 @@ SubagentsRoot (从 env 拿 AgentStore)
 - [x] FSEvents 监听，外部编辑 500ms 内列表刷新
 - [x] Reveal in Finder
 
-### 📋 待做（P1-7 ~ P1-10）
+### ✅ 已交付（P1-7 · Prompts）
 
-**P1-7 · Prompts 模块**
+- `Features/Prompts/CommandFrontmatter.swift` + 4 个 schema 测试（字段：`description` / `argument-hint` / `allowed-tools`）
+- `Features/Prompts/CommandScanner.swift` + 5 个 scanner 测试：递归扫 `commands/` 子目录，用路径拼 `/namespace:command`
+- `Features/Prompts/CommandStore.swift`：load / save / create / delete / watch（复用 `SafeTextWriter` + `DirectoryWatcher`）
+- `PromptsRoot.swift` / `CommandListView.swift` / `CommandEditorView.swift` / `NewCommandSheet.swift`
+- Sidebar 按目录分组折叠；新建时可选目标子目录
+- 项目级 `.claude/commands/` 以 `Project` section 加入 sidebar
+- `ModuleRoute.prompts.phase = 0`（chip 消失）
 
-差异点：
-- 文件可能分布在子目录里（`~/.claude/commands/frontend/lint.md` → `/frontend:lint`）
-- frontmatter 字段预期：`description`、`argument-hint`、`allowed-tools`
-- sidebar 按目录分组折叠；新建时可指定目标子目录
-- 项目级 `.claude/commands/` 加入 sidebar 的 `Project` section
+### ✅ 已交付（P1-8 · Skills）
 
-**P1-8 · Skills 模块**
+- `Features/Skills/SkillFrontmatter.swift` + 3 个 schema 测试（字段：`name` / `description` / 可选 `license` + `allowed-tools`）
+- `Features/Skills/SkillClassifier.swift` + 6 个分类测试：目录形态（`<name>/SKILL.md`）、符号链接解引用、plugin-provided 识别、缺失 SKILL.md 的残缺标记
+- `Features/Skills/SkillStore.swift`：list / load / save / create / delete + FSEvents
+- `SkillsRoot.swift` / `SkillListView.swift` / `SkillEditorView.swift` / `NewSkillSheet.swift`
+- Plugin-provided skill 独立 section 只读展示（按钮置灰）
+- 残缺 skill 列表里标红、保留在 sidebar 供排查
 
-差异点：
-- 目录形态：每个 skill 是 `<name>/SKILL.md` + 可能的脚本/资源文件
-- frontmatter 字段预期：`name`、`description`、可选 `license` / `allowed-tools`
-- 符号链接处理：列表显示 "→ 实际路径" 提示；保存前弹窗确认改的是源文件
-- Plugin-provided 只读：`~/.claude/plugins/cache/<plugin>/skills/` 下的 skill 在 sidebar 独立 section，按钮置灰
-- 残缺处理：目录没有 SKILL.md 标红；loose `.md` 文件显示 "unexpected"
+### ✅ 已交付（P1-9 · 保存前 diff 预览）
 
-**P1-9 · 保存前 diff 预览**
+- `Features/Authoring/DiffPreviewSheet.swift` + `TextDiffTests.swift`（7 个测试）
+- 简单行 diff 渲染 before / after，编辑场景默认弹预览，新建走静默保存
+- `MarkdownEditor` 在 Phase 1 中期升级为 preview / edit 切换（`MarkdownUI` 渲染 block 级 markdown），预览上限 256 KB
+- 三个模块（Subagents / Prompts / Skills）统一接入同一个 diff sheet
 
-- 新建不预览，编辑才弹
-- 用 `CollectionDifference` 或简单行 diff 渲染 `before / after`
-- 可以选 "Diff first" 作为默认，或直接保存（设置项）
+### 跨模块整合
 
-**P1-10 · 跨 scope 迁移**
+- Plugins 模块（Phase 3）为三类资源加了"来源"徽章，点击 → 跳转到 Plugins 模块聚焦该插件
+- Prompts / Skills / Subagents 的列表项显示 `Global / Project / Plugin: <name>` 三态
 
-- "Copy to Project" / "Promote to Global" 动作
-- 处理同名冲突（提示 / 自动加后缀 / 取消）
-- Subagents 和 Prompts 都需要；Skills 因为目录形态，迁移要连整个目录拷贝
+### 未落地（P1-10 · 跨 scope 迁移）
+
+"Copy to Project" / "Promote to Global" 动作最终没在 v0.1.0 前落地。原因：Phase 3 的跨模块跳转 + Plugins 的来源徽章已经覆盖 "我这个 skill 来自哪" 的主要痛点；真正需要"在 global / project 之间搬家"的用户场景少，留到 v0.2.x 再做。
 
 ## 里程碑
 
@@ -171,11 +175,11 @@ SubagentsRoot (从 env 拿 AgentStore)
 | P1-3 | FrontmatterDocument + AgentFrontmatter | `d7c40b1`→`9249ef7` 之间 | 4 个测试覆盖标准形 / 未知键 round-trip / empty model / 无 frontmatter |
 | P1-4 | AgentStore + FSEvents | `9249ef7` | 扫描 83 个 agent，外部编辑 500ms 内刷新 |
 | P1-5 | MarkdownEditor + 表单原子组件 | `3e9a983` | 复用到 `AgentEditorView` + `NewAgentSheet` |
-| P1-6 | Subagents 模块端到端 | HEAD | app 启动 → Subagents route → 可编辑 / 保存 / 新建 / 删除 / reveal |
-| P1-7 | Prompts 模块 | — | 📋 |
-| P1-8 | Skills 模块 | — | 📋 |
-| P1-9 | 保存前 diff 预览 | — | 📋 |
-| P1-10 | 跨 scope 迁移（Copy to Project / Promote to Global） | — | 📋 |
+| P1-6 | Subagents 模块端到端 | `58e877f` | app 启动 → Subagents route → 可编辑 / 保存 / 新建 / 删除 / reveal |
+| P1-7 | Prompts 模块 | `3de38d9` | 递归子目录 + `/ns:cmd` 命名、sidebar 分组折叠、Project section 可用 |
+| P1-8 | Skills 模块 | `aba60b2` → `52a21be` | 目录形态、symlink 解引用、plugin-provided 只读 section、残缺标记 |
+| P1-9 | 保存前 diff 预览 | `447a0d9` | 编辑默认弹 sheet、新建直接落盘；三模块共用 |
+| P1-10 | 跨 scope 迁移（Copy to Project / Promote to Global） | — | ⏭ 延后至 v0.2.x |
 
 ## 对 Phase 2 的影响
 
@@ -186,5 +190,5 @@ SubagentsRoot (从 env 拿 AgentStore)
 ## 遗留 / 约定
 
 - 手撸 YAML-lite 解析器只覆盖实测出现的写法；遇到用户手工塞了嵌套 map / anchor / tag 的文件会降级为 "无 frontmatter + raw body"，不会炸但会失去表单编辑能力。后续如遇真实案例再切 Yams。
-- 保存是直接覆写磁盘，没有"只改 UI 状态不落盘"的 staging 概念；P1-9 的 diff 预览会补上"确认后才落盘"。
-- 项目级（project scope）agents 当前 Store 里无 UI 入口；会随 Prompts/Skills 一起引入 sidebar 的 `Project` section。
+- P1-10 跨 scope 迁移未落地：真实使用中"在 global / project 之间搬家"的场景少，由 Plugins 模块的跨模块跳转 + 来源徽章覆盖了主要痛点；留待后续 minor 版本。
+- `MarkdownEditor` 只是 preview / edit 切换，没有语法高亮；等外部提示再升级，避免过早引入体量大的编辑器依赖。

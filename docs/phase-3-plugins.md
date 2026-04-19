@@ -1,7 +1,8 @@
 # Phase 3 · Plugins 编排与 Marketplace
 
-**状态**：📋 计划中
-**预计工作量**：约 1 周
+**状态**：✅ 完成（扫描 / 启用开关 / 跨模块跳转 / 自动更新检测均已上线）
+**时间窗**：2026-04-18
+**Git 范围**：`66b6ee2` → `c46ebee`
 **依赖**：Phase 1（md+frontmatter 操作 skills/commands/agents）、Phase 2（JSON 编辑 mcpServers/hooks/settings）
 
 ## 目标
@@ -79,54 +80,65 @@ Plugins 路由
 - 卸载时同理：展示要删的所有文件和要回滚的所有 JSON key
 - 所有可逆操作通过 `.bak` 保留一次回滚能力
 
-## 交付内容（计划）
+## 交付内容
 
 ### 基础设施
 
-- `Features/Plugins/PluginStore.swift`
-- `Features/Plugins/MarketplaceService.swift`
-- `Features/Plugins/InstallerService.swift`
-- `Features/Plugins/ManifestParser.swift`（plugin.json / marketplace.json）
+- `Features/Plugins/PluginModels.swift` + `PluginManifestParser.swift` —— plugin.json / marketplace.json 类型化 + 解析；`PluginManifestTests` 5 个测试
+- `Features/Plugins/PluginScanner.swift` —— 扫 `~/.claude/plugins/cache/<marketplace>/<plugin>/`，按最新 mtime 去重同名插件
+- `Features/Plugins/PluginsStore.swift` —— 已安装插件 list / 启用开关 / diff 落盘
+- `Features/Plugins/MarketplacesStore.swift` + `MarketplaceModels.swift` + `MarketplacesStoreTests` 5 个测试 —— marketplace 源管理与插件清单聚合
 
 ### UI
 
 - `Features/Plugins/PluginsRoot.swift`
-- `Features/Plugins/InstalledListView.swift`
-- `Features/Plugins/MarketplaceListView.swift`
-- `Features/Plugins/EffectGraphView.swift`
-- `Features/Plugins/PluginDetailView.swift`
+- `Features/Plugins/PluginsListView.swift` —— 已安装插件列表 + 启用 toggle + 更新徽章
+- `Features/Plugins/PluginDetailView.swift` —— manifest + 贡献资源清单 + 启用 / 卸载 / 重新扫描
 
-### 跨模块改动
+### 跨模块改动（✅ 全部落地）
 
-- Phase 1 的三个模块（Prompts / Skills / Subagents）在列表项上加 "来源" 徽章（Global / Project / Plugin: <name>）
-- Phase 2 的 MCP / Hooks 同样加来源徽章
-- 点击来源徽章 → 跳转到 Plugins 模块聚焦该插件
+- Phase 1 的 Prompts / Skills / Subagents 列表项加 "来源" 徽章（Global / Project / Plugin: <name>）
+- Phase 2 的 MCP 同样加来源徽章；plugin-declared server 自动合并进 MCP 列表
+- 点击来源徽章 → `Navigator.focus(plugin:)` → 跳转到 Plugins 模块聚焦该插件
+- 反向跳转：Plugins 详情页里列出贡献的 skills / commands / agents / mcpServers，点击 → 跳到对应模块的该资源
 
-## 里程碑（计划草案）
+### 自动更新（✅ `c46ebee`）
 
-| # | 任务 | 预估 | 状态 |
+- `GitUpdateChecker`（+ 4 个单测）— 定期 `git ls-remote` 比较 marketplace 源的最新 commit 与本地 cache
+- Plugins 详情页显示 "Update available" 徽章；marketplace 级别可选 "auto-update" toggle
+- 更新走重新 clone → swap → 再通过 diff 预览落盘
+
+## 里程碑
+
+| # | 任务 | Commit | 状态 |
 |---|---|---|---|
-| P3-1 | Manifest 解析器（plugin.json / marketplace.json）+ 测试 | 1 天 | 📋 |
-| P3-2 | PluginStore（扫描 + 反向索引） | 1 天 | 📋 |
-| P3-3 | Installed tab + 详情视图 | 1-2 天 | 📋 |
-| P3-4 | Marketplace tab + 安装流水线 | 2 天 | 📋 |
-| P3-5 | EffectGraphView | 1-2 天 | 📋 |
-| P3-6 | 各模块列表项"来源"徽章 + 跳转 | 1 天 | 📋 |
-| P3-7 | 卸载 / 更新流水线 | 2 天 | 📋 |
+| P3-1 | Manifest 解析器（plugin.json / marketplace.json）+ 测试 | `66b6ee2` | ✅ |
+| P3-2 | PluginsStore（扫描 + 启用开关） | `cebfae9` | ✅ |
+| P3-3 | Plugins UI + 详情视图（enable toggle + diff save） | `c8f31a0` | ✅ |
+| P3-4 | wire Hooks + Plugins routes end-to-end | `665f994` | ✅ |
+| P3-5 | 跨模块跳转（Prompts / Skills / Subagents） | `42d1c0c` | ✅ |
+| P3-5a | 跨模块跳转扩展至 Agents + MCP | `fb5f4e4` | ✅ |
+| P3-5b | MCP 加载 plugin-declared servers | `bb3992e` | ✅ |
+| P3-6 | dedupe cache by latest-mtime per marketplace+plugin | `4863e02` | ✅ |
+| P3-7 | 检测 + 应用更新 + marketplace auto-update toggle | `c46ebee` | ✅ |
+| — | EffectGraphView（独立图视图） | — | ⏭ 未落地：已被"来源徽章 + 跨模块跳转"替代；复杂图视图需求未验证 |
+| — | 安装流水线（gh clone / git pull） | — | ⏭ 未落地：v0.1.0 仅管理已安装的 plugin，安装仍靠 CC CLI；后续迭代补 |
 
-## 风险 / 未决
+## 风险 / 未决（已处理）
 
-- **Marketplace 源格式**：Anthropic 官方是否有正式 registry？目前市面上多是 git 仓库直接 clone。Phase 3 开工前需要把当前主流做法盘一遍，决定支持几种源
-- **插件能运行任意代码**：安装流程是否允许执行 `postinstall` 脚本？倾向于 "不允许，只做文件拷贝 + JSON 合并"，脚本执行改由用户手动触发（避免 supply chain 风险）
-- **回滚精度**：JSON 合并能精准回滚（记录具体新增的 key），但如果插件注入的内容被用户又手工改过，怎么回滚？需要 diff 取交集 / 只删没被用户改过的部分
-- **更新策略**：plugins 有没有 semver 约束？`plugin.json` 里能不能声明最低 VibeBuddy 版本？
+- **Marketplace 源格式**：决定只读 `~/.claude/plugins/cache/<marketplace>/` 下已由 Claude Code CLI 拉下来的清单，不自己做 clone；避免和 CC 的 plugin 管理机制冲突
+- **插件能运行任意代码**：v0.1.0 完全不执行任何插件脚本，只做"展示 + 启用 toggle + diff"；安装 / 卸载仍由 CC CLI 负责
+- **回滚精度**：所有 JSON 改动走 `SafeJSONStore` 的 diff sheet，用户能在落盘前看到 "本次启用这个 plugin 会加进哪几行" 的精确 diff
+- **更新策略**：`GitUpdateChecker` 定期检查 marketplace 的 git 源 `HEAD`，有新 commit 就提示；auto-update 只更新本地 cache，不自动启用变更
 
-## 对后续的影响
+## 后续工作（v0.2+）
 
-Phase 3 结束后，8 个模块全部落地。再之后的工作属于增强型：
+Phase 3 结束后 9 个模块全部落地，v0.1.0 已发版。后续增强型方向：
 
+- Plugin 安装流水线（直接在 app 内 clone / 装 marketplace + plugin）
+- EffectGraphView：可视化 "本机所有 plugin × 所有资源" 的二分图
 - 会话导出 / 分享
 - 配置方案管理（多套 settings.json 切换，像 git branch）
 - 插件发布工具链（作为插件作者的辅助工具）
 - 多语言 UI（i18n）
-- App icon 设计、markdown 编辑器升级为语法高亮
+- Markdown 编辑器升级为语法高亮
